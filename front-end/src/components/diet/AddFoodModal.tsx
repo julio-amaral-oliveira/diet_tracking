@@ -29,6 +29,8 @@ export function AddFoodModal({ open, onOpenChange, mealId }: AddFoodModalProps) 
   const [grams, setGrams] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [foodForm, setFoodForm] = useState(emptyFoodForm);
+  const [createAttempted, setCreateAttempted] = useState(false);
+  const [addAttempted, setAddAttempted] = useState(false);
 
   const { data: foods, isLoading } = useFoods(search, 0, 20);
   const addItem = useAddMealItem();
@@ -42,7 +44,31 @@ export function AddFoodModal({ open, onOpenChange, mealId }: AddFoodModalProps) 
     return Math.round((pro * 4 + carb * 4 + fat * 9) * 100) / 100;
   }, [foodForm.protein, foodForm.carbs, foodForm.fat]);
 
+  const foodFormErrors = useMemo(() => {
+    const invalidMacro = (value: string) =>
+      value.trim() === "" || isNaN(parseFloat(value)) || parseFloat(value) < 0;
+
+    return {
+      name: !foodForm.name.trim() ? "Nome é obrigatório." : "",
+      protein: invalidMacro(foodForm.protein) ? "Informe a proteína em gramas." : "",
+      carbs: invalidMacro(foodForm.carbs) ? "Informe os carboidratos em gramas." : "",
+      fat: invalidMacro(foodForm.fat) ? "Informe a gordura em gramas." : "",
+    };
+  }, [foodForm]);
+
+  const gramsValue = parseFloat(grams);
+  const gramsError = (addAttempted || grams.trim() !== "") && (!grams.trim() || isNaN(gramsValue) || gramsValue <= 0)
+    ? "Informe uma quantidade maior que zero."
+    : "";
+
+  const resetCreateForm = () => {
+    setShowCreateForm(false);
+    setFoodForm(emptyFoodForm);
+    setCreateAttempted(false);
+  };
+
   const handleCreateInline = () => {
+    setCreateAttempted(true);
     const pro = parseFloat(foodForm.protein);
     const carb = parseFloat(foodForm.carbs);
     const fat = parseFloat(foodForm.fat);
@@ -65,8 +91,7 @@ export function AddFoodModal({ open, onOpenChange, mealId }: AddFoodModalProps) 
         onSuccess: (result) => {
           toast({ title: "Alimento criado!", description: `${result.name} adicionado.` });
           setSelectedFood(result);
-          setShowCreateForm(false);
-          setFoodForm(emptyFoodForm);
+          resetCreateForm();
         },
         onError: () => {
           toast({ title: "Erro", description: "Não foi possível criar o alimento.", variant: "destructive" });
@@ -76,13 +101,15 @@ export function AddFoodModal({ open, onOpenChange, mealId }: AddFoodModalProps) 
   };
 
   const handleAdd = () => {
-    if (!selectedFood || !grams) return;
+    setAddAttempted(true);
+    if (!selectedFood || !grams.trim() || isNaN(gramsValue) || gramsValue <= 0) return;
+
     addItem.mutate(
       {
         mealId,
         item: {
           food_item_id: selectedFood.id,
-          quantity_grams: parseFloat(grams),
+          quantity_grams: gramsValue,
         },
       },
       {
@@ -93,6 +120,7 @@ export function AddFoodModal({ open, onOpenChange, mealId }: AddFoodModalProps) 
           });
           setSelectedFood(null);
           setGrams("");
+          setAddAttempted(false);
           setSearch("");
           onOpenChange(false);
         },
@@ -137,18 +165,87 @@ export function AddFoodModal({ open, onOpenChange, mealId }: AddFoodModalProps) 
           {/* Inline create food form */}
           {showCreateForm && !selectedFood && (
             <div className="rounded-xl border p-3 space-y-3">
-              <p className="text-sm font-medium">Criar Novo Alimento (valores por 100g)</p>
+              <p className="text-sm font-medium">Criar novo alimento (valores por 100g)</p>
               <div className="space-y-2">
-                <Input placeholder="Nome" value={foodForm.name} onChange={(e) => setFoodForm({ ...foodForm, name: e.target.value })} />
-                <Input placeholder="Marca (opcional)" value={foodForm.brand} onChange={(e) => setFoodForm({ ...foodForm, brand: e.target.value })} />
+                <div className="space-y-1.5">
+                  <Label htmlFor="inline-food-name">Nome</Label>
+                  <Input
+                    id="inline-food-name"
+                    placeholder="Ex: Peito de frango"
+                    value={foodForm.name}
+                    onChange={(e) => setFoodForm({ ...foodForm, name: e.target.value })}
+                    aria-invalid={createAttempted && !!foodFormErrors.name}
+                  />
+                  {createAttempted && foodFormErrors.name && (
+                    <p className="text-xs text-destructive">{foodFormErrors.name}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="inline-food-brand">Marca (opcional)</Label>
+                  <Input
+                    id="inline-food-brand"
+                    placeholder="Ex: Sadia"
+                    value={foodForm.brand}
+                    onChange={(e) => setFoodForm({ ...foodForm, brand: e.target.value })}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Input type="number" min="0" step="0.1" placeholder="Proteína (g)" value={foodForm.protein} onChange={(e) => setFoodForm({ ...foodForm, protein: e.target.value })} />
-                <Input type="number" min="0" step="0.1" placeholder="Carboidratos (g)" value={foodForm.carbs} onChange={(e) => setFoodForm({ ...foodForm, carbs: e.target.value })} />
-                <Input type="number" min="0" step="0.1" placeholder="Gordura (g)" value={foodForm.fat} onChange={(e) => setFoodForm({ ...foodForm, fat: e.target.value })} />
-                <div className="flex items-center">
-                  <div className="w-full rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                    {computedCalories > 0 ? `${computedCalories} kcal` : "Calorias (auto)"}
+                <div className="space-y-1.5">
+                  <Label htmlFor="inline-food-protein">Proteína (g)</Label>
+                  <Input
+                    id="inline-food-protein"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    inputMode="decimal"
+                    placeholder="31"
+                    value={foodForm.protein}
+                    onChange={(e) => setFoodForm({ ...foodForm, protein: e.target.value })}
+                    aria-invalid={createAttempted && !!foodFormErrors.protein}
+                  />
+                  {createAttempted && foodFormErrors.protein && (
+                    <p className="text-xs text-destructive">{foodFormErrors.protein}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="inline-food-carbs">Carboidratos (g)</Label>
+                  <Input
+                    id="inline-food-carbs"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    inputMode="decimal"
+                    placeholder="0"
+                    value={foodForm.carbs}
+                    onChange={(e) => setFoodForm({ ...foodForm, carbs: e.target.value })}
+                    aria-invalid={createAttempted && !!foodFormErrors.carbs}
+                  />
+                  {createAttempted && foodFormErrors.carbs && (
+                    <p className="text-xs text-destructive">{foodFormErrors.carbs}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="inline-food-fat">Gordura (g)</Label>
+                  <Input
+                    id="inline-food-fat"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    inputMode="decimal"
+                    placeholder="3.6"
+                    value={foodForm.fat}
+                    onChange={(e) => setFoodForm({ ...foodForm, fat: e.target.value })}
+                    aria-invalid={createAttempted && !!foodFormErrors.fat}
+                  />
+                  {createAttempted && foodFormErrors.fat && (
+                    <p className="text-xs text-destructive">{foodFormErrors.fat}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-muted-foreground">Calorias (auto)</Label>
+                  <div className="flex h-9 w-full items-center rounded-md border bg-muted/50 px-3 text-sm text-muted-foreground">
+                    {computedCalories > 0 ? `${computedCalories} kcal` : "-"}
                   </div>
                 </div>
               </div>
@@ -157,7 +254,7 @@ export function AddFoodModal({ open, onOpenChange, mealId }: AddFoodModalProps) 
                   {createFood.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                   Criar
                 </Button>
-                <Button variant="outline" onClick={() => { setShowCreateForm(false); setFoodForm(emptyFoodForm); }}>
+                <Button variant="outline" onClick={resetCreateForm}>
                   Cancelar
                 </Button>
               </div>
@@ -190,7 +287,7 @@ export function AddFoodModal({ open, onOpenChange, mealId }: AddFoodModalProps) 
                 >
                   <div className="font-medium">{food.name}</div>
                   <div className="text-xs text-muted-foreground">
-                    {food.calories_kcal} kcal · P: {food.protein_g}g · C: {food.carbs_g}g · G:{" "}
+                    {food.calories_kcal} kcal - P: {food.protein_g}g - C: {food.carbs_g}g - G:{" "}
                     {food.fat_g}g (por 100g)
                   </div>
                 </button>
@@ -221,7 +318,10 @@ export function AddFoodModal({ open, onOpenChange, mealId }: AddFoodModalProps) 
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setSelectedFood(null)}
+                  onClick={() => {
+                    setSelectedFood(null);
+                    setAddAttempted(false);
+                  }}
                 >
                   Trocar
                 </Button>
@@ -232,19 +332,23 @@ export function AddFoodModal({ open, onOpenChange, mealId }: AddFoodModalProps) 
                 <Input
                   id="grams"
                   type="number"
-                  min="1"
+                  min="0.1"
+                  step="0.1"
+                  inputMode="decimal"
                   placeholder="Ex: 150"
                   value={grams}
                   onChange={(e) => setGrams(e.target.value)}
+                  aria-invalid={!!gramsError}
                 />
-                {grams && parseFloat(grams) > 0 && (
+                {gramsError && <p className="text-xs text-destructive">{gramsError}</p>}
+                {grams && !isNaN(gramsValue) && gramsValue > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    ≈{" "}
-                    {((selectedFood.calories_kcal * parseFloat(grams)) / 100).toFixed(0)}{" "}
-                    kcal · P:{" "}
-                    {((selectedFood.protein_g * parseFloat(grams)) / 100).toFixed(1)}g · C:{" "}
-                    {((selectedFood.carbs_g * parseFloat(grams)) / 100).toFixed(1)}g · G:{" "}
-                    {((selectedFood.fat_g * parseFloat(grams)) / 100).toFixed(1)}g
+                    Aproximadamente{" "}
+                    {((selectedFood.calories_kcal * gramsValue) / 100).toFixed(0)}{" "}
+                    kcal - P:{" "}
+                    {((selectedFood.protein_g * gramsValue) / 100).toFixed(1)}g - C:{" "}
+                    {((selectedFood.carbs_g * gramsValue) / 100).toFixed(1)}g - G:{" "}
+                    {((selectedFood.fat_g * gramsValue) / 100).toFixed(1)}g
                   </p>
                 )}
               </div>
@@ -252,7 +356,7 @@ export function AddFoodModal({ open, onOpenChange, mealId }: AddFoodModalProps) 
               <Button
                 className="w-full mt-3"
                 onClick={handleAdd}
-                disabled={!grams || parseFloat(grams) <= 0 || addItem.isPending}
+                disabled={!grams.trim() || isNaN(gramsValue) || gramsValue <= 0 || addItem.isPending}
               >
                 {addItem.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />

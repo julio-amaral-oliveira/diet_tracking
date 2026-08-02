@@ -60,6 +60,46 @@ import { toast } from "@/hooks/use-toast";
 
 // Draft state: tracks local quantity edits keyed by item ID
 type DraftChanges = Record<number, number>; // itemId -> new quantity
+type MacroValues = { protein: string; carbs: string; fat: string };
+type MacroFieldErrors = Partial<Record<keyof MacroValues, string>>;
+
+const MACRO_LABELS: Record<keyof MacroValues, string> = {
+  protein: "Proteína",
+  carbs: "Carboidratos",
+  fat: "Gordura",
+};
+
+const parseMacroValue = (value: string) => {
+  if (!value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : NaN;
+};
+
+const validateMacroValues = (values: MacroValues) => {
+  const errors: MacroFieldErrors = {};
+  let positiveTotal = 0;
+
+  (Object.keys(values) as Array<keyof MacroValues>).forEach((key) => {
+    const parsed = parseMacroValue(values[key]);
+
+    if (parsed === null) {
+      errors[key] = `Informe ${MACRO_LABELS[key].toLowerCase()}.`;
+      return;
+    }
+
+    if (Number.isNaN(parsed) || parsed < 0) {
+      errors[key] = "Use um número maior ou igual a zero.";
+      return;
+    }
+
+    positiveTotal += parsed;
+  });
+
+  return {
+    errors,
+    formError: positiveTotal > 0 ? "" : "Informe pelo menos uma meta maior que zero.",
+  };
+};
 
 export default function DietPlan() {
   const { data: plan, isLoading, isError } = useCurrentDietPlan();
@@ -81,16 +121,21 @@ export default function DietPlan() {
 
   const [mealDialogOpen, setMealDialogOpen] = useState(false);
   const [newMealName, setNewMealName] = useState("");
+  const [newMealNameError, setNewMealNameError] = useState("");
   const [createPlanOpen, setCreatePlanOpen] = useState(false);
   const [usePerKg, setUsePerKg] = useState(false);
   const [newPlan, setNewPlan] = useState({ protein: "", carbs: "", fat: "" });
   const [newPlanPerKg, setNewPlanPerKg] = useState({ protein: "", carbs: "", fat: "" });
+  const [newPlanErrors, setNewPlanErrors] = useState<MacroFieldErrors>({});
+  const [newPlanFormError, setNewPlanFormError] = useState("");
 
   // Edit Targets state
   const [editTargetsOpen, setEditTargetsOpen] = useState(false);
   const [editUsePerKg, setEditUsePerKg] = useState(false);
   const [editTargets, setEditTargets] = useState({ protein: "", carbs: "", fat: "" });
   const [editTargetsPerKg, setEditTargetsPerKg] = useState({ protein: "", carbs: "", fat: "" });
+  const [editTargetsErrors, setEditTargetsErrors] = useState<MacroFieldErrors>({});
+  const [editTargetsFormError, setEditTargetsFormError] = useState("");
 
   // Draft mode state
   const [draftChanges, setDraftChanges] = useState<DraftChanges>({});
@@ -99,6 +144,8 @@ export default function DietPlan() {
   // Variation management state
   const [newVariationDialogOpen, setNewVariationDialogOpen] = useState(false);
   const [newVariationName, setNewVariationName] = useState("");
+  const [newVariationNameError, setNewVariationNameError] = useState("");
+  const [newVariationSourceError, setNewVariationSourceError] = useState("");
   const [newVariationMode, setNewVariationMode] = useState<"empty" | "duplicate">("empty");
   const [duplicateSourceId, setDuplicateSourceId] = useState<number | null>(null);
 
@@ -106,6 +153,7 @@ export default function DietPlan() {
   const [renameVariationDialogOpen, setRenameVariationDialogOpen] = useState(false);
   const [renameVariationId, setRenameVariationId] = useState<number | null>(null);
   const [renameVariationValue, setRenameVariationValue] = useState("");
+  const [renameVariationError, setRenameVariationError] = useState("");
 
   // Delete variation state
   const [deleteVariationDialogOpen, setDeleteVariationDialogOpen] = useState(false);
@@ -231,7 +279,11 @@ export default function DietPlan() {
   };
 
   const handleAddMeal = () => {
-    if (!activeVariation || !newMealName.trim()) return;
+    if (!activeVariation) return;
+    if (!newMealName.trim()) {
+      setNewMealNameError("Informe o nome da refeição.");
+      return;
+    }
     const nextOrder = activeVariation.meals.length;
     addMealToVariation.mutate(
       { variationId: activeVariation.id, meal: { name: newMealName.trim(), order_index: nextOrder } },
@@ -239,6 +291,7 @@ export default function DietPlan() {
         onSuccess: () => {
           toast({ title: "Refeição adicionada!", description: `${newMealName} foi criada.` });
           setNewMealName("");
+          setNewMealNameError("");
           setMealDialogOpen(false);
         },
       }
@@ -276,6 +329,16 @@ export default function DietPlan() {
   };
 
   const handleCreatePlan = () => {
+    const values = usePerKg ? newPlanPerKg : newPlan;
+    const validation = validateMacroValues(values);
+    setNewPlanErrors(validation.errors);
+    setNewPlanFormError(validation.formError);
+
+    if (Object.keys(validation.errors).length > 0 || validation.formError) {
+      toast({ title: "Revise as metas", description: "Corrija os campos destacados antes de criar o plano.", variant: "destructive" });
+      return;
+    }
+
     const abs = resolveAbsoluteValues("create");
     const cal = calcCalories(String(abs.protein), String(abs.carbs), String(abs.fat));
 
@@ -294,6 +357,8 @@ export default function DietPlan() {
           setCreatePlanOpen(false);
           setNewPlan({ protein: "", carbs: "", fat: "" });
           setNewPlanPerKg({ protein: "", carbs: "", fat: "" });
+          setNewPlanErrors({});
+          setNewPlanFormError("");
           setUsePerKg(false);
         },
         onError: () => {
@@ -318,11 +383,23 @@ export default function DietPlan() {
       });
     }
     setEditUsePerKg(false);
+    setEditTargetsErrors({});
+    setEditTargetsFormError("");
     setEditTargetsOpen(true);
   };
 
   const handleSaveTargets = () => {
     if (!plan) return;
+    const values = editUsePerKg ? editTargetsPerKg : editTargets;
+    const validation = validateMacroValues(values);
+    setEditTargetsErrors(validation.errors);
+    setEditTargetsFormError(validation.formError);
+
+    if (Object.keys(validation.errors).length > 0 || validation.formError) {
+      toast({ title: "Revise as metas", description: "Corrija os campos destacados antes de salvar.", variant: "destructive" });
+      return;
+    }
+
     const abs = resolveAbsoluteValues("edit");
     const cal = calcCalories(String(abs.protein), String(abs.carbs), String(abs.fat));
 
@@ -339,6 +416,8 @@ export default function DietPlan() {
       {
         onSuccess: () => {
           toast({ title: "Metas atualizadas!", description: "As metas do plano foram salvas." });
+          setEditTargetsErrors({});
+          setEditTargetsFormError("");
           setEditTargetsOpen(false);
         },
         onError: () => {
@@ -350,7 +429,17 @@ export default function DietPlan() {
 
   // Variation handlers
   const handleCreateVariation = () => {
-    if (!plan || !newVariationName.trim()) return;
+    if (!plan) return;
+    const nameError = newVariationName.trim() ? "" : "Informe o nome da variação.";
+    const sourceError = newVariationMode === "duplicate" && duplicateSourceId == null
+      ? "Escolha uma variação para duplicar."
+      : "";
+    setNewVariationNameError(nameError);
+    setNewVariationSourceError(sourceError);
+    if (nameError || sourceError) {
+      toast({ title: "Revise a variação", description: "Corrija os campos destacados antes de continuar.", variant: "destructive" });
+      return;
+    }
     const nextOrder = sortedVariations.length;
 
     createVariation.mutate(
@@ -367,6 +456,8 @@ export default function DietPlan() {
           });
           setNewVariationDialogOpen(false);
           setNewVariationName("");
+          setNewVariationNameError("");
+          setNewVariationSourceError("");
           setNewVariationMode("empty");
           setDuplicateSourceId(null);
           // Switch to new variation tab
@@ -380,7 +471,11 @@ export default function DietPlan() {
   };
 
   const handleRenameVariation = () => {
-    if (!renameVariationId || !renameVariationValue.trim()) return;
+    if (!renameVariationId) return;
+    if (!renameVariationValue.trim()) {
+      setRenameVariationError("Informe o nome da variação.");
+      return;
+    }
     renameVariation.mutate(
       { variationId: renameVariationId, name: renameVariationValue.trim() },
       {
@@ -389,6 +484,7 @@ export default function DietPlan() {
           setRenameVariationDialogOpen(false);
           setRenameVariationId(null);
           setRenameVariationValue("");
+          setRenameVariationError("");
         },
         onError: () => {
           toast({ title: "Erro", description: "Não foi possível renomear.", variant: "destructive" });
@@ -452,15 +548,21 @@ export default function DietPlan() {
     perKg,
     setPerKg,
     computedCal,
+    errors,
+    formError,
+    onClearError,
   }: {
     mode: string;
     isPerKg: boolean;
     setIsPerKg: (v: boolean) => void;
-    absolute: { protein: string; carbs: string; fat: string };
-    setAbsolute: (v: { protein: string; carbs: string; fat: string }) => void;
-    perKg: { protein: string; carbs: string; fat: string };
-    setPerKg: (v: { protein: string; carbs: string; fat: string }) => void;
+    absolute: MacroValues;
+    setAbsolute: (v: MacroValues) => void;
+    perKg: MacroValues;
+    setPerKg: (v: MacroValues) => void;
     computedCal: number;
+    errors: MacroFieldErrors;
+    formError: string;
+    onClearError: (field: keyof MacroValues) => void;
   }) => (
     <div className="space-y-4">
       {/* Toggle g/kg */}
@@ -517,44 +619,83 @@ export default function DietPlan() {
         {!isPerKg ? (
           <>
             <div className="space-y-2">
-              <Label>Proteína (g)</Label>
+              <Label htmlFor={`${mode}-protein`}>Proteína total (g)</Label>
               <Input
+                id={`${mode}-protein`}
                 type="number"
+                min="0"
+                step="1"
+                inputMode="decimal"
                 value={absolute.protein}
-                onChange={(e) => setAbsolute({ ...absolute, protein: e.target.value })}
-                placeholder="180"
+                onChange={(e) => {
+                  setAbsolute({ ...absolute, protein: e.target.value });
+                  onClearError("protein");
+                }}
+                placeholder="Ex: 180"
+                aria-invalid={Boolean(errors.protein)}
+                aria-describedby={errors.protein ? `${mode}-protein-error` : undefined}
               />
+              {errors.protein && <p id={`${mode}-protein-error`} className="text-xs text-destructive">{errors.protein}</p>}
             </div>
             <div className="space-y-2">
-              <Label>Carboidratos (g)</Label>
+              <Label htmlFor={`${mode}-carbs`}>Carboidratos totais (g)</Label>
               <Input
+                id={`${mode}-carbs`}
                 type="number"
+                min="0"
+                step="1"
+                inputMode="decimal"
                 value={absolute.carbs}
-                onChange={(e) => setAbsolute({ ...absolute, carbs: e.target.value })}
-                placeholder="300"
+                onChange={(e) => {
+                  setAbsolute({ ...absolute, carbs: e.target.value });
+                  onClearError("carbs");
+                }}
+                placeholder="Ex: 300"
+                aria-invalid={Boolean(errors.carbs)}
+                aria-describedby={errors.carbs ? `${mode}-carbs-error` : undefined}
               />
+              {errors.carbs && <p id={`${mode}-carbs-error`} className="text-xs text-destructive">{errors.carbs}</p>}
             </div>
             <div className="space-y-2">
-              <Label>Gordura (g)</Label>
+              <Label htmlFor={`${mode}-fat`}>Gordura total (g)</Label>
               <Input
+                id={`${mode}-fat`}
                 type="number"
+                min="0"
+                step="1"
+                inputMode="decimal"
                 value={absolute.fat}
-                onChange={(e) => setAbsolute({ ...absolute, fat: e.target.value })}
-                placeholder="80"
+                onChange={(e) => {
+                  setAbsolute({ ...absolute, fat: e.target.value });
+                  onClearError("fat");
+                }}
+                placeholder="Ex: 80"
+                aria-invalid={Boolean(errors.fat)}
+                aria-describedby={errors.fat ? `${mode}-fat-error` : undefined}
               />
+              {errors.fat && <p id={`${mode}-fat-error`} className="text-xs text-destructive">{errors.fat}</p>}
             </div>
           </>
         ) : (
           <>
             <div className="space-y-2">
-              <Label>Proteína (g/kg)</Label>
+              <Label htmlFor={`${mode}-protein-per-kg`}>Proteína por kg (g/kg)</Label>
               <Input
+                id={`${mode}-protein-per-kg`}
                 type="number"
+                min="0"
                 step="0.1"
+                inputMode="decimal"
                 value={perKg.protein}
-                onChange={(e) => setPerKg({ ...perKg, protein: e.target.value })}
-                placeholder="2.0"
+                onChange={(e) => {
+                  setPerKg({ ...perKg, protein: e.target.value });
+                  onClearError("protein");
+                }}
+                placeholder="Ex: 2,0"
+                aria-invalid={Boolean(errors.protein)}
+                aria-describedby={errors.protein ? `${mode}-protein-per-kg-error` : undefined}
               />
+              {errors.protein && <p id={`${mode}-protein-per-kg-error`} className="text-xs text-destructive">{errors.protein}</p>}
               {latestWeight && perKg.protein && (
                 <p className="text-xs text-muted-foreground">
                   = {((parseFloat(perKg.protein) || 0) * latestWeight).toFixed(0)}g
@@ -562,14 +703,23 @@ export default function DietPlan() {
               )}
             </div>
             <div className="space-y-2">
-              <Label>Carboidratos (g/kg)</Label>
+              <Label htmlFor={`${mode}-carbs-per-kg`}>Carboidratos por kg (g/kg)</Label>
               <Input
+                id={`${mode}-carbs-per-kg`}
                 type="number"
+                min="0"
                 step="0.1"
+                inputMode="decimal"
                 value={perKg.carbs}
-                onChange={(e) => setPerKg({ ...perKg, carbs: e.target.value })}
-                placeholder="4.0"
+                onChange={(e) => {
+                  setPerKg({ ...perKg, carbs: e.target.value });
+                  onClearError("carbs");
+                }}
+                placeholder="Ex: 4,0"
+                aria-invalid={Boolean(errors.carbs)}
+                aria-describedby={errors.carbs ? `${mode}-carbs-per-kg-error` : undefined}
               />
+              {errors.carbs && <p id={`${mode}-carbs-per-kg-error`} className="text-xs text-destructive">{errors.carbs}</p>}
               {latestWeight && perKg.carbs && (
                 <p className="text-xs text-muted-foreground">
                   = {((parseFloat(perKg.carbs) || 0) * latestWeight).toFixed(0)}g
@@ -577,14 +727,23 @@ export default function DietPlan() {
               )}
             </div>
             <div className="space-y-2">
-              <Label>Gordura (g/kg)</Label>
+              <Label htmlFor={`${mode}-fat-per-kg`}>Gordura por kg (g/kg)</Label>
               <Input
+                id={`${mode}-fat-per-kg`}
                 type="number"
+                min="0"
                 step="0.1"
+                inputMode="decimal"
                 value={perKg.fat}
-                onChange={(e) => setPerKg({ ...perKg, fat: e.target.value })}
-                placeholder="1.0"
+                onChange={(e) => {
+                  setPerKg({ ...perKg, fat: e.target.value });
+                  onClearError("fat");
+                }}
+                placeholder="Ex: 1,0"
+                aria-invalid={Boolean(errors.fat)}
+                aria-describedby={errors.fat ? `${mode}-fat-per-kg-error` : undefined}
               />
+              {errors.fat && <p id={`${mode}-fat-per-kg-error`} className="text-xs text-destructive">{errors.fat}</p>}
               {latestWeight && perKg.fat && (
                 <p className="text-xs text-muted-foreground">
                   = {((parseFloat(perKg.fat) || 0) * latestWeight).toFixed(0)}g
@@ -598,10 +757,11 @@ export default function DietPlan() {
         <div className="space-y-2">
           <Label className="text-muted-foreground">Calorias (auto)</Label>
           <div className="flex h-9 w-full items-center rounded-md border bg-muted/50 px-3 text-sm text-muted-foreground">
-            {computedCal > 0 ? `${computedCal} kcal` : "—"}
+            {computedCal > 0 ? `${computedCal} kcal` : "-"}
           </div>
         </div>
       </div>
+      {formError && <p className="text-xs text-destructive">{formError}</p>}
     </div>
   );
 
@@ -630,7 +790,16 @@ export default function DietPlan() {
           </CardContent>
         </Card>
 
-        <Dialog open={createPlanOpen} onOpenChange={setCreatePlanOpen}>
+        <Dialog
+          open={createPlanOpen}
+          onOpenChange={(open) => {
+            setCreatePlanOpen(open);
+            if (!open) {
+              setNewPlanErrors({});
+              setNewPlanFormError("");
+            }
+          }}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Criar Plano Alimentar</DialogTitle>
@@ -647,6 +816,12 @@ export default function DietPlan() {
               perKg={newPlanPerKg}
               setPerKg={setNewPlanPerKg}
               computedCal={newPlanCalories}
+              errors={newPlanErrors}
+              formError={newPlanFormError}
+              onClearError={(field) => {
+                setNewPlanErrors((prev) => ({ ...prev, [field]: undefined }));
+                setNewPlanFormError("");
+              }}
             />
             <Button onClick={handleCreatePlan} className="w-full" disabled={createPlan.isPending}>
               {createPlan.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
@@ -963,7 +1138,13 @@ export default function DietPlan() {
       )}
 
       {/* Add meal dialog */}
-      <Dialog open={mealDialogOpen} onOpenChange={setMealDialogOpen}>
+      <Dialog
+        open={mealDialogOpen}
+        onOpenChange={(open) => {
+          setMealDialogOpen(open);
+          if (!open) setNewMealNameError("");
+        }}
+      >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Nova Refeição</DialogTitle>
@@ -977,10 +1158,16 @@ export default function DietPlan() {
               <Input
                 placeholder="Ex: Café da Manhã, Almoço, Lanche..."
                 value={newMealName}
-                onChange={(e) => setNewMealName(e.target.value)}
+                onChange={(e) => {
+                  setNewMealName(e.target.value);
+                  setNewMealNameError("");
+                }}
+                aria-invalid={Boolean(newMealNameError)}
+                aria-describedby={newMealNameError ? "new-meal-name-error" : undefined}
               />
+              {newMealNameError && <p id="new-meal-name-error" className="text-xs text-destructive">{newMealNameError}</p>}
             </div>
-            <Button onClick={handleAddMeal} className="w-full" disabled={addMealToVariation.isPending || !newMealName.trim()}>
+            <Button onClick={handleAddMeal} className="w-full" disabled={addMealToVariation.isPending}>
               {addMealToVariation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Criar Refeição
             </Button>
@@ -989,7 +1176,16 @@ export default function DietPlan() {
       </Dialog>
 
       {/* Edit Targets dialog */}
-      <Dialog open={editTargetsOpen} onOpenChange={setEditTargetsOpen}>
+      <Dialog
+        open={editTargetsOpen}
+        onOpenChange={(open) => {
+          setEditTargetsOpen(open);
+          if (!open) {
+            setEditTargetsErrors({});
+            setEditTargetsFormError("");
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar Metas</DialogTitle>
@@ -1006,6 +1202,12 @@ export default function DietPlan() {
             perKg={editTargetsPerKg}
             setPerKg={setEditTargetsPerKg}
             computedCal={editCalories}
+            errors={editTargetsErrors}
+            formError={editTargetsFormError}
+            onClearError={(field) => {
+              setEditTargetsErrors((prev) => ({ ...prev, [field]: undefined }));
+              setEditTargetsFormError("");
+            }}
           />
           <Button onClick={handleSaveTargets} className="w-full" disabled={updateTargets.isPending}>
             {updateTargets.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
@@ -1015,7 +1217,16 @@ export default function DietPlan() {
       </Dialog>
 
       {/* Create Variation dialog */}
-      <Dialog open={newVariationDialogOpen} onOpenChange={setNewVariationDialogOpen}>
+      <Dialog
+        open={newVariationDialogOpen}
+        onOpenChange={(open) => {
+          setNewVariationDialogOpen(open);
+          if (!open) {
+            setNewVariationNameError("");
+            setNewVariationSourceError("");
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -1033,7 +1244,10 @@ export default function DietPlan() {
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setNewVariationMode("empty")}
+                  onClick={() => {
+                    setNewVariationMode("empty");
+                    setNewVariationSourceError("");
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     newVariationMode === "empty"
                       ? "bg-primary text-primary-foreground"
@@ -1061,8 +1275,14 @@ export default function DietPlan() {
               <Input
                 placeholder="Ex: Substituição, Dia de folga..."
                 value={newVariationName}
-                onChange={(e) => setNewVariationName(e.target.value)}
+                onChange={(e) => {
+                  setNewVariationName(e.target.value);
+                  setNewVariationNameError("");
+                }}
+                aria-invalid={Boolean(newVariationNameError)}
+                aria-describedby={newVariationNameError ? "new-variation-name-error" : undefined}
               />
+              {newVariationNameError && <p id="new-variation-name-error" className="text-xs text-destructive">{newVariationNameError}</p>}
             </div>
 
             {/* Source selection for duplicate mode */}
@@ -1074,7 +1294,10 @@ export default function DietPlan() {
                     <button
                       key={v.id}
                       type="button"
-                      onClick={() => setDuplicateSourceId(v.id)}
+                      onClick={() => {
+                        setDuplicateSourceId(v.id);
+                        setNewVariationSourceError("");
+                      }}
                       className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-colors ${
                         duplicateSourceId === v.id
                           ? "border-primary bg-primary/5 text-foreground"
@@ -1086,6 +1309,7 @@ export default function DietPlan() {
                     </button>
                   ))}
                 </div>
+                {newVariationSourceError && <p className="text-xs text-destructive">{newVariationSourceError}</p>}
               </div>
             )}
 
@@ -1093,9 +1317,7 @@ export default function DietPlan() {
               onClick={handleCreateVariation}
               className="w-full"
               disabled={
-                createVariation.isPending ||
-                !newVariationName.trim() ||
-                (newVariationMode === "duplicate" && duplicateSourceId == null)
+                createVariation.isPending
               }
             >
               {createVariation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
@@ -1116,7 +1338,13 @@ export default function DietPlan() {
       </Dialog>
 
       {/* Rename Variation dialog */}
-      <Dialog open={renameVariationDialogOpen} onOpenChange={setRenameVariationDialogOpen}>
+      <Dialog
+        open={renameVariationDialogOpen}
+        onOpenChange={(open) => {
+          setRenameVariationDialogOpen(open);
+          if (!open) setRenameVariationError("");
+        }}
+      >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Renomear Variação</DialogTitle>
@@ -1127,14 +1355,20 @@ export default function DietPlan() {
               <Label>Nome</Label>
               <Input
                 value={renameVariationValue}
-                onChange={(e) => setRenameVariationValue(e.target.value)}
+                onChange={(e) => {
+                  setRenameVariationValue(e.target.value);
+                  setRenameVariationError("");
+                }}
                 placeholder="Nome da variação"
+                aria-invalid={Boolean(renameVariationError)}
+                aria-describedby={renameVariationError ? "rename-variation-error" : undefined}
               />
+              {renameVariationError && <p id="rename-variation-error" className="text-xs text-destructive">{renameVariationError}</p>}
             </div>
             <Button
               onClick={handleRenameVariation}
               className="w-full"
-              disabled={renameVariation.isPending || !renameVariationValue.trim()}
+              disabled={renameVariation.isPending}
             >
               {renameVariation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Salvar

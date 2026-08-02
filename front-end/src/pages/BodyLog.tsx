@@ -68,6 +68,38 @@ function toNum(v: string): number | null {
   return isNaN(n) || n <= 0 ? null : n;
 }
 
+function emptyBodyLogFormValues(date: string): BodyLogFormData {
+  return {
+    date,
+    weight_kg: "",
+    skinfold_chest: "",
+    skinfold_abdominal: "",
+    skinfold_thigh: "",
+    skinfold_triceps: "",
+    skinfold_subscapular: "",
+    skinfold_suprailiac: "",
+    skinfold_axillary: "",
+    bio_body_fat_percent: "",
+    bio_muscle_mass_kg: "",
+    circ_neck: "",
+    circ_shoulder: "",
+    circ_chest_relaxed: "",
+    circ_arm_relaxed_right: "",
+    circ_arm_relaxed_left: "",
+    circ_arm_contracted_right: "",
+    circ_arm_contracted_left: "",
+    circ_forearm_right: "",
+    circ_forearm_left: "",
+    circ_waist: "",
+    circ_abdomen: "",
+    circ_hips: "",
+    circ_thigh_proximal_right: "",
+    circ_thigh_proximal_left: "",
+    circ_calf_right: "",
+    circ_calf_left: "",
+  };
+}
+
 function FormField({
   label,
   id,
@@ -93,9 +125,9 @@ function FormField({
         type="number"
         step="0.1"
         min="0"
-        placeholder={placeholder || "0"}
+        placeholder={placeholder}
         {...register(id)}
-        className="h-8 text-sm"
+        className="h-10 text-base sm:text-sm"
       />
       {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
@@ -141,6 +173,8 @@ export default function BodyLog() {
   const [editCircThighProximalLeft, setEditCircThighProximalLeft] = useState("");
   const [editCircCalfRight, setEditCircCalfRight] = useState("");
   const [editCircCalfLeft, setEditCircCalfLeft] = useState("");
+  const [editSaveAttempted, setEditSaveAttempted] = useState(false);
+  const [resetMessage, setResetMessage] = useState("");
 
   // Coach dialog state
   const [coachDialogOpen, setCoachDialogOpen] = useState(false);
@@ -152,24 +186,18 @@ export default function BodyLog() {
     reset,
     formState: { errors },
   } = useForm<BodyLogFormData>({
-    defaultValues: {
-      date: today,
-      weight_kg: "",
-      skinfold_chest: "", skinfold_abdominal: "", skinfold_thigh: "",
-      skinfold_triceps: "", skinfold_subscapular: "", skinfold_suprailiac: "",
-      skinfold_axillary: "", bio_body_fat_percent: "", bio_muscle_mass_kg: "",
-      circ_neck: "", circ_shoulder: "", circ_chest_relaxed: "",
-      circ_arm_relaxed_right: "", circ_arm_relaxed_left: "",
-      circ_arm_contracted_right: "", circ_arm_contracted_left: "",
-      circ_forearm_right: "", circ_forearm_left: "",
-      circ_waist: "", circ_abdomen: "",
-      circ_hips: "",
-      circ_thigh_proximal_right: "", circ_thigh_proximal_left: "",
-      circ_calf_right: "", circ_calf_left: "",
-    },
+    defaultValues: emptyBodyLogFormValues(today),
   });
 
+  const editWeightNumber = parseFloat(editWeight);
+  const editDateError = editSaveAttempted && !editDate ? "Informe a data do registro." : "";
+  const editWeightError =
+    editSaveAttempted && (!editWeight.trim() || isNaN(editWeightNumber) || editWeightNumber <= 0)
+      ? "Informe um peso maior que zero."
+      : "";
+
   const onSubmit = (data: BodyLogFormData) => {
+    setResetMessage("");
     const weightNum = parseFloat(data.weight_kg);
     if (!data.date || isNaN(weightNum) || weightNum <= 0) {
       toast({ title: "Erro", description: "Data e peso são obrigatórios.", variant: "destructive" });
@@ -214,9 +242,10 @@ export default function BodyLog() {
           : "";
         toast({
           title: "Registro salvo!",
-          description: `Peso: ${result.weight_kg} kg${bfMsg}`,
+          description: `Peso: ${result.weight_kg} kg${bfMsg}. O formulário foi limpo para um novo registro.`,
         });
-        reset({ date: today });
+        reset(emptyBodyLogFormValues(today));
+        setResetMessage("Registro salvo. Campos limpos e data redefinida para hoje.");
 
         // Task 5: Trigger stagnation check after successful log
         checkStagnation.mutate(
@@ -243,10 +272,16 @@ export default function BodyLog() {
     });
   };
 
+  const onInvalidSubmit = () => {
+    setResetMessage("");
+    toast({ title: "Erro", description: "Corrija data e peso antes de salvar.", variant: "destructive" });
+  };
+
   const numToStr = (v: number | null | undefined): string => v != null ? String(v) : "";
 
   const handleEditOpen = (log: BodyLogResponse) => {
     setEditingLog(log);
+    setEditSaveAttempted(false);
     setEditDate(log.date);
     setEditWeight(String(log.weight_kg));
     setEditBf(numToStr(log.bio_body_fat_percent));
@@ -279,9 +314,12 @@ export default function BodyLog() {
 
   const handleEditSave = () => {
     if (!editingLog) return;
-    const w = parseFloat(editWeight);
-    if (isNaN(w) || w <= 0) {
-      toast({ title: "Erro", description: "Peso inválido.", variant: "destructive" });
+    setEditSaveAttempted(true);
+    const w = editWeightNumber;
+    const hasEditDateError = !editDate;
+    const hasEditWeightError = !editWeight.trim() || isNaN(w) || w <= 0;
+    if (hasEditDateError || hasEditWeightError) {
+      toast({ title: "Erro", description: "Corrija os campos destacados antes de salvar.", variant: "destructive" });
       return;
     }
 
@@ -383,7 +421,12 @@ export default function BodyLog() {
 
         {/* New Log Form Tab */}
         <TabsContent value="form">
-          <form onSubmit={handleSubmit(onSubmit)}>
+          <form
+            onSubmit={handleSubmit(onSubmit, onInvalidSubmit)}
+            onChange={() => {
+              if (resetMessage) setResetMessage("");
+            }}
+          >
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Dados Principais</CardTitle>
@@ -392,7 +435,11 @@ export default function BodyLog() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="date">Data</Label>
-                    <Input id="date" type="date" {...register("date")} />
+                    <Input
+                      id="date"
+                      type="date"
+                      {...register("date", { required: "Informe a data do registro." })}
+                    />
                     {errors.date && (
                       <p className="text-xs text-red-400">{errors.date.message}</p>
                     )}
@@ -405,7 +452,13 @@ export default function BodyLog() {
                       step="0.1"
                       min="0"
                       placeholder="Ex: 82.5"
-                      {...register("weight_kg")}
+                      {...register("weight_kg", {
+                        required: "Informe o peso.",
+                        validate: (value) => {
+                          const weight = parseFloat(value);
+                          return (!isNaN(weight) && weight > 0) || "Informe um peso maior que zero.";
+                        },
+                      })}
                     />
                     {errors.weight_kg && (
                       <p className="text-xs text-red-400">{errors.weight_kg.message}</p>
@@ -496,6 +549,9 @@ export default function BodyLog() {
                 )}
                 Salvar Registro
               </Button>
+              {resetMessage && (
+                <p className="mt-2 text-sm text-muted-foreground">{resetMessage}</p>
+              )}
             </div>
           </form>
         </TabsContent>
@@ -582,12 +638,35 @@ export default function BodyLog() {
             {/* Main fields */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Data</Label>
-                <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
+                <Label htmlFor="edit-date">Data</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  aria-invalid={!!editDateError}
+                  aria-describedby={editDateError ? "edit-date-error" : undefined}
+                />
+                {editDateError && (
+                  <p id="edit-date-error" className="text-xs text-red-400">{editDateError}</p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label>Peso (kg)</Label>
-                <Input type="number" step="0.1" min="0" value={editWeight} onChange={(e) => setEditWeight(e.target.value)} />
+                <Label htmlFor="edit-weight">Peso (kg)</Label>
+                <Input
+                  id="edit-weight"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={editWeight}
+                  onChange={(e) => setEditWeight(e.target.value)}
+                  placeholder="Ex: 82.5"
+                  aria-invalid={!!editWeightError}
+                  aria-describedby={editWeightError ? "edit-weight-error" : undefined}
+                />
+                {editWeightError && (
+                  <p id="edit-weight-error" className="text-xs text-red-400">{editWeightError}</p>
+                )}
               </div>
             </div>
 
@@ -599,11 +678,11 @@ export default function BodyLog() {
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     <div className="space-y-1">
                       <Label className="text-xs">% Gordura</Label>
-                      <Input type="number" step="0.1" min="0" max="100" value={editBf} onChange={(e) => setEditBf(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" max="100" value={editBf} onChange={(e) => setEditBf(e.target.value)} placeholder="Ex: 18.5" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Massa Muscular (kg)</Label>
-                      <Input type="number" step="0.1" min="0" value={editMuscleMass} onChange={(e) => setEditMuscleMass(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editMuscleMass} onChange={(e) => setEditMuscleMass(e.target.value)} placeholder="Ex: 62.0" className="h-10 text-base sm:text-sm" />
                     </div>
                   </div>
                 </AccordionContent>
@@ -616,31 +695,31 @@ export default function BodyLog() {
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     <div className="space-y-1">
                       <Label className="text-xs">Peitoral</Label>
-                      <Input type="number" step="0.1" min="0" value={editSkinfoldChest} onChange={(e) => setEditSkinfoldChest(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editSkinfoldChest} onChange={(e) => setEditSkinfoldChest(e.target.value)} placeholder="Ex: 12.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Abdômen</Label>
-                      <Input type="number" step="0.1" min="0" value={editSkinfoldAbdominal} onChange={(e) => setEditSkinfoldAbdominal(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editSkinfoldAbdominal} onChange={(e) => setEditSkinfoldAbdominal(e.target.value)} placeholder="Ex: 18.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Coxa</Label>
-                      <Input type="number" step="0.1" min="0" value={editSkinfoldThigh} onChange={(e) => setEditSkinfoldThigh(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editSkinfoldThigh} onChange={(e) => setEditSkinfoldThigh(e.target.value)} placeholder="Ex: 16.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Tríceps</Label>
-                      <Input type="number" step="0.1" min="0" value={editSkinfoldTriceps} onChange={(e) => setEditSkinfoldTriceps(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editSkinfoldTriceps} onChange={(e) => setEditSkinfoldTriceps(e.target.value)} placeholder="Ex: 10.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Subescapular</Label>
-                      <Input type="number" step="0.1" min="0" value={editSkinfoldSubscapular} onChange={(e) => setEditSkinfoldSubscapular(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editSkinfoldSubscapular} onChange={(e) => setEditSkinfoldSubscapular(e.target.value)} placeholder="Ex: 14.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Suprailíaca</Label>
-                      <Input type="number" step="0.1" min="0" value={editSkinfoldSuprailiac} onChange={(e) => setEditSkinfoldSuprailiac(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editSkinfoldSuprailiac} onChange={(e) => setEditSkinfoldSuprailiac(e.target.value)} placeholder="Ex: 13.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Axilar Média</Label>
-                      <Input type="number" step="0.1" min="0" value={editSkinfoldAxillary} onChange={(e) => setEditSkinfoldAxillary(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editSkinfoldAxillary} onChange={(e) => setEditSkinfoldAxillary(e.target.value)} placeholder="Ex: 11.0" className="h-10 text-base sm:text-sm" />
                     </div>
                   </div>
                 </AccordionContent>
@@ -653,67 +732,67 @@ export default function BodyLog() {
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     <div className="space-y-1">
                       <Label className="text-xs">Pescoço</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircNeck} onChange={(e) => setEditCircNeck(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircNeck} onChange={(e) => setEditCircNeck(e.target.value)} placeholder="Ex: 38.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Ombro</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircShoulder} onChange={(e) => setEditCircShoulder(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircShoulder} onChange={(e) => setEditCircShoulder(e.target.value)} placeholder="Ex: 118.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Peitoral</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircChestRelaxed} onChange={(e) => setEditCircChestRelaxed(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircChestRelaxed} onChange={(e) => setEditCircChestRelaxed(e.target.value)} placeholder="Ex: 102.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Braço Relaxado Dir.</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircArmRelaxedRight} onChange={(e) => setEditCircArmRelaxedRight(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircArmRelaxedRight} onChange={(e) => setEditCircArmRelaxedRight(e.target.value)} placeholder="Ex: 34.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Braço Relaxado Esq.</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircArmRelaxedLeft} onChange={(e) => setEditCircArmRelaxedLeft(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircArmRelaxedLeft} onChange={(e) => setEditCircArmRelaxedLeft(e.target.value)} placeholder="Ex: 34.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Braço Contraído Dir.</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircArmContractedRight} onChange={(e) => setEditCircArmContractedRight(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircArmContractedRight} onChange={(e) => setEditCircArmContractedRight(e.target.value)} placeholder="Ex: 37.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Braço Contraído Esq.</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircArmContractedLeft} onChange={(e) => setEditCircArmContractedLeft(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircArmContractedLeft} onChange={(e) => setEditCircArmContractedLeft(e.target.value)} placeholder="Ex: 37.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Antebraço Dir.</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircForearmRight} onChange={(e) => setEditCircForearmRight(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircForearmRight} onChange={(e) => setEditCircForearmRight(e.target.value)} placeholder="Ex: 29.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Antebraço Esq.</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircForearmLeft} onChange={(e) => setEditCircForearmLeft(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircForearmLeft} onChange={(e) => setEditCircForearmLeft(e.target.value)} placeholder="Ex: 29.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Cintura</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircWaist} onChange={(e) => setEditCircWaist(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircWaist} onChange={(e) => setEditCircWaist(e.target.value)} placeholder="Ex: 82.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Abdômen</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircAbdomen} onChange={(e) => setEditCircAbdomen(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircAbdomen} onChange={(e) => setEditCircAbdomen(e.target.value)} placeholder="Ex: 86.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Quadril</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircHips} onChange={(e) => setEditCircHips(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircHips} onChange={(e) => setEditCircHips(e.target.value)} placeholder="Ex: 98.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Coxa Dir.</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircThighProximalRight} onChange={(e) => setEditCircThighProximalRight(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircThighProximalRight} onChange={(e) => setEditCircThighProximalRight(e.target.value)} placeholder="Ex: 60.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Coxa Esq.</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircThighProximalLeft} onChange={(e) => setEditCircThighProximalLeft(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircThighProximalLeft} onChange={(e) => setEditCircThighProximalLeft(e.target.value)} placeholder="Ex: 60.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Panturrilha Dir.</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircCalfRight} onChange={(e) => setEditCircCalfRight(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircCalfRight} onChange={(e) => setEditCircCalfRight(e.target.value)} placeholder="Ex: 39.0" className="h-10 text-base sm:text-sm" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Panturrilha Esq.</Label>
-                      <Input type="number" step="0.1" min="0" value={editCircCalfLeft} onChange={(e) => setEditCircCalfLeft(e.target.value)} placeholder="—" className="h-8 text-sm" />
+                      <Input type="number" step="0.1" min="0" value={editCircCalfLeft} onChange={(e) => setEditCircCalfLeft(e.target.value)} placeholder="Ex: 39.0" className="h-10 text-base sm:text-sm" />
                     </div>
                   </div>
                 </AccordionContent>

@@ -32,6 +32,7 @@ export default function FoodAdmin() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [foodForm, setFoodForm] = useState(emptyFoodForm);
+  const [createAttempted, setCreateAttempted] = useState(false);
 
   const { data: foods, isLoading } = useFoods(search, page * PAGE_SIZE, PAGE_SIZE);
   const importTaco = useImportTaco();
@@ -45,7 +46,27 @@ export default function FoodAdmin() {
     return Math.round((pro * 4 + carb * 4 + fat * 9) * 100) / 100;
   }, [foodForm.protein, foodForm.carbs, foodForm.fat]);
 
+  const foodFormErrors = useMemo(() => {
+    const invalidMacro = (value: string) =>
+      value.trim() === "" || isNaN(parseFloat(value)) || parseFloat(value) < 0;
+
+    return {
+      name: !foodForm.name.trim() ? "Nome é obrigatório." : "",
+      protein: invalidMacro(foodForm.protein) ? "Informe a proteína em gramas." : "",
+      carbs: invalidMacro(foodForm.carbs) ? "Informe os carboidratos em gramas." : "",
+      fat: invalidMacro(foodForm.fat) ? "Informe a gordura em gramas." : "",
+    };
+  }, [foodForm]);
+
+  const handleCreateOpenChange = (open: boolean) => {
+    setCreateOpen(open);
+    if (!open) {
+      setCreateAttempted(false);
+    }
+  };
+
   const handleCreateFood = () => {
+    setCreateAttempted(true);
     const pro = parseFloat(foodForm.protein);
     const carb = parseFloat(foodForm.carbs);
     const fat = parseFloat(foodForm.fat);
@@ -72,6 +93,7 @@ export default function FoodAdmin() {
         onSuccess: (result) => {
           toast({ title: "Alimento criado!", description: `${result.name} adicionado ao banco de dados.` });
           setFoodForm(emptyFoodForm);
+          setCreateAttempted(false);
           setCreateOpen(false);
         },
         onError: () => {
@@ -251,7 +273,7 @@ export default function FoodAdmin() {
       </Card>
 
       {/* Create food dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog open={createOpen} onOpenChange={handleCreateOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Criar Alimento</DialogTitle>
@@ -261,16 +283,22 @@ export default function FoodAdmin() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Nome</Label>
+              <Label htmlFor="admin-food-name">Nome</Label>
               <Input
+                id="admin-food-name"
                 placeholder="Ex: Peito de Frango Grelhado"
                 value={foodForm.name}
                 onChange={(e) => setFoodForm({ ...foodForm, name: e.target.value })}
+                aria-invalid={createAttempted && !!foodFormErrors.name}
               />
+              {createAttempted && foodFormErrors.name && (
+                <p className="text-xs text-destructive">{foodFormErrors.name}</p>
+              )}
             </div>
             <div className="space-y-2">
-              <Label>Marca (opcional)</Label>
+              <Label htmlFor="admin-food-brand">Marca (opcional)</Label>
               <Input
+                id="admin-food-brand"
                 placeholder="Ex: Sadia"
                 value={foodForm.brand}
                 onChange={(e) => setFoodForm({ ...foodForm, brand: e.target.value })}
@@ -278,42 +306,60 @@ export default function FoodAdmin() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Proteína (g/100g)</Label>
+                <Label htmlFor="admin-food-protein">Proteína (g/100g)</Label>
                 <Input
+                  id="admin-food-protein"
                   type="number"
                   min="0"
                   step="0.1"
+                  inputMode="decimal"
                   placeholder="31"
                   value={foodForm.protein}
                   onChange={(e) => setFoodForm({ ...foodForm, protein: e.target.value })}
+                  aria-invalid={createAttempted && !!foodFormErrors.protein}
                 />
+                {createAttempted && foodFormErrors.protein && (
+                  <p className="text-xs text-destructive">{foodFormErrors.protein}</p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label>Carboidratos (g/100g)</Label>
+                <Label htmlFor="admin-food-carbs">Carboidratos (g/100g)</Label>
                 <Input
+                  id="admin-food-carbs"
                   type="number"
                   min="0"
                   step="0.1"
+                  inputMode="decimal"
                   placeholder="0"
                   value={foodForm.carbs}
                   onChange={(e) => setFoodForm({ ...foodForm, carbs: e.target.value })}
+                  aria-invalid={createAttempted && !!foodFormErrors.carbs}
                 />
+                {createAttempted && foodFormErrors.carbs && (
+                  <p className="text-xs text-destructive">{foodFormErrors.carbs}</p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label>Gordura (g/100g)</Label>
+                <Label htmlFor="admin-food-fat">Gordura (g/100g)</Label>
                 <Input
+                  id="admin-food-fat"
                   type="number"
                   min="0"
                   step="0.1"
+                  inputMode="decimal"
                   placeholder="3.6"
                   value={foodForm.fat}
                   onChange={(e) => setFoodForm({ ...foodForm, fat: e.target.value })}
+                  aria-invalid={createAttempted && !!foodFormErrors.fat}
                 />
+                {createAttempted && foodFormErrors.fat && (
+                  <p className="text-xs text-destructive">{foodFormErrors.fat}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-muted-foreground">Calorias (auto)</Label>
                 <div className="flex h-9 w-full items-center rounded-md border bg-muted/50 px-3 text-sm text-muted-foreground">
-                  {computedCalories > 0 ? `${computedCalories} kcal` : "—"}
+                  {computedCalories > 0 ? `${computedCalories} kcal` : "-"}
                 </div>
               </div>
             </div>

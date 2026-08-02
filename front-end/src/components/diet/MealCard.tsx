@@ -43,6 +43,8 @@ export function MealCard({ meal, draftChanges, onQuantityChange }: MealCardProps
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(meal.name);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [quantityInputs, setQuantityInputs] = useState<Record<number, string>>({});
+  const [focusedQuantityId, setFocusedQuantityId] = useState<number | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   const removeItem = useRemoveMealItem();
@@ -56,6 +58,21 @@ export function MealCard({ meal, draftChanges, onQuantityChange }: MealCardProps
       renameInputRef.current.select();
     }
   }, [isRenaming]);
+
+  useEffect(() => {
+    setQuantityInputs((current) => {
+      const next: Record<number, string> = {};
+
+      meal.items.forEach((item) => {
+        next[item.id] =
+          focusedQuantityId === item.id && current[item.id] != null
+            ? current[item.id]
+            : String(draftChanges[item.id] ?? item.quantity_grams);
+      });
+
+      return next;
+    });
+  }, [meal.items, draftChanges, focusedQuantityId]);
 
   const handleRemove = (itemId: number, name: string) => {
     removeItem.mutate(itemId, {
@@ -115,6 +132,24 @@ export function MealCard({ meal, draftChanges, onQuantityChange }: MealCardProps
         toast({ title: "Erro", description: "Não foi possível excluir a refeição.", variant: "destructive" });
       },
     });
+  };
+
+  const handleQuantityInputChange = (itemId: number, value: string) => {
+    setQuantityInputs((current) => ({ ...current, [itemId]: value }));
+
+    const parsed = parseFloat(value);
+    if (value.trim() && !isNaN(parsed) && parsed > 0) {
+      onQuantityChange(itemId, parsed);
+    }
+  };
+
+  const handleQuantityBlur = (itemId: number, fallbackQty: number) => {
+    const value = quantityInputs[itemId] ?? "";
+    const parsed = parseFloat(value);
+
+    if (!value.trim() || isNaN(parsed) || parsed <= 0) {
+      setQuantityInputs((current) => ({ ...current, [itemId]: String(fallbackQty) }));
+    }
   };
 
   // Calculate meal totals considering draft changes
@@ -178,8 +213,8 @@ export function MealCard({ meal, draftChanges, onQuantityChange }: MealCardProps
               <>
                 <CardTitle className="text-base font-semibold">{meal.name}</CardTitle>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {Math.round(mealTotals.calories)} kcal · P: {mealTotals.protein.toFixed(1)}g · C:{" "}
-                  {mealTotals.carbs.toFixed(1)}g · G: {mealTotals.fat.toFixed(1)}g
+                  {Math.round(mealTotals.calories)} kcal - P: {mealTotals.protein.toFixed(1)}g - C:{" "}
+                  {mealTotals.carbs.toFixed(1)}g - G: {mealTotals.fat.toFixed(1)}g
                 </p>
               </>
             )}
@@ -226,7 +261,7 @@ export function MealCard({ meal, draftChanges, onQuantityChange }: MealCardProps
               <TableHeader>
                 <TableRow className="text-xs">
                   <TableHead>Alimento</TableHead>
-                  <TableHead className="w-[110px] text-center">Qtd (g)</TableHead>
+                  <TableHead className="w-[120px] sm:w-[132px] text-center">Qtd (g)</TableHead>
                   <TableHead className="text-right">Calorias</TableHead>
                   <TableHead className="text-right hidden sm:table-cell">P</TableHead>
                   <TableHead className="text-right hidden sm:table-cell">C</TableHead>
@@ -240,26 +275,34 @@ export function MealCard({ meal, draftChanges, onQuantityChange }: MealCardProps
                   const currentQty = draftQty ?? item.quantity_grams;
                   const ratio = item.quantity_grams > 0 ? currentQty / item.quantity_grams : 0;
                   const isDraft = draftQty != null;
+                  const inputValue = quantityInputs[item.id] ?? String(currentQty);
+                  const parsedInput = parseFloat(inputValue);
+                  const quantityError = !inputValue.trim() || isNaN(parsedInput) || parsedInput <= 0;
 
                   return (
                     <TableRow key={item.id} className={isDraft ? "bg-primary/5" : ""}>
                       <TableCell className="font-medium text-sm max-w-[180px] truncate">
                         {item.food_item_name}
                       </TableCell>
-                      <TableCell className="text-center p-1">
+                      <TableCell className="text-center p-1 align-top">
                         <Input
                           type="number"
-                          min="1"
-                          step="1"
-                          value={currentQty}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value);
-                            if (!isNaN(val) && val > 0) {
-                              onQuantityChange(item.id, val);
-                            }
+                          min="0.1"
+                          step="0.1"
+                          inputMode="decimal"
+                          value={inputValue}
+                          onFocus={() => setFocusedQuantityId(item.id)}
+                          onChange={(e) => handleQuantityInputChange(item.id, e.target.value)}
+                          onBlur={() => {
+                            setFocusedQuantityId(null);
+                            handleQuantityBlur(item.id, currentQty);
                           }}
-                          className={`h-8 text-sm text-center w-[90px] mx-auto tabular-nums ${isDraft ? "border-primary" : ""}`}
+                          aria-invalid={quantityError}
+                          className={`h-8 text-sm text-center w-24 sm:w-28 mx-auto tabular-nums ${isDraft ? "border-primary" : ""}`}
                         />
+                        {quantityError && (
+                          <p className="mt-1 text-[11px] leading-tight text-destructive">Maior que zero</p>
+                        )}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-sm">
                         {Math.round(item.calculated_calories * ratio)}
