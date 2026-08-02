@@ -129,10 +129,13 @@ export function useUpdateMealItem() {
 
 export function useRenameMeal() {
   const queryClient = useQueryClient();
+  const profile = useSelectedProfile();
 
   return useMutation<MealResponse, Error, { mealId: number; name: string }>({
     mutationFn: async ({ mealId, name }) => {
-      const { data } = await api.patch(`/diet/meals/${mealId}`, { name });
+      const { data } = await api.patch(`/diet/meals/${mealId}`, { name }, {
+        params: { user_id: profile?.user_id ?? "default_user" },
+      });
       return data;
     },
     onSuccess: () => {
@@ -143,10 +146,13 @@ export function useRenameMeal() {
 
 export function useDeleteMeal() {
   const queryClient = useQueryClient();
+  const profile = useSelectedProfile();
 
   return useMutation<MessageResponse, Error, number>({
     mutationFn: async (mealId) => {
-      const { data } = await api.delete(`/diet/meals/${mealId}`);
+      const { data } = await api.delete(`/diet/meals/${mealId}`, {
+        params: { user_id: profile?.user_id ?? "default_user" },
+      });
       return data;
     },
     onSuccess: () => {
@@ -181,10 +187,13 @@ export function useCreateVariation() {
 
 export function useRenameVariation() {
   const queryClient = useQueryClient();
+  const profile = useSelectedProfile();
 
   return useMutation<DietVariationResponse, Error, { variationId: number; name: string }>({
     mutationFn: async ({ variationId, name }) => {
-      const { data } = await api.patch(`/diet/variations/${variationId}`, { name });
+      const { data } = await api.patch(`/diet/variations/${variationId}`, { name }, {
+        params: { user_id: profile?.user_id ?? "default_user" },
+      });
       return data;
     },
     onSuccess: () => {
@@ -195,10 +204,13 @@ export function useRenameVariation() {
 
 export function useDeleteVariation() {
   const queryClient = useQueryClient();
+  const profile = useSelectedProfile();
 
   return useMutation<MessageResponse, Error, number>({
     mutationFn: async (variationId) => {
-      const { data } = await api.delete(`/diet/variations/${variationId}`);
+      const { data } = await api.delete(`/diet/variations/${variationId}`, {
+        params: { user_id: profile?.user_id ?? "default_user" },
+      });
       return data;
     },
     onSuccess: () => {
