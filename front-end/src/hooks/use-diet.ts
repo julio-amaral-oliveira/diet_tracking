@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/axios";
+import { useSelectedProfile } from "@/contexts/ProfileContext";
 import type {
   DietPlanFullResponse,
   DietVariationCreate,
@@ -13,7 +14,10 @@ import type {
   MessageResponse,
 } from "@/lib/types";
 
-export function useCurrentDietPlan(userId = "default_user") {
+export function useCurrentDietPlan() {
+  const profile = useSelectedProfile();
+  const userId = profile?.user_id ?? "default_user";
+
   return useQuery<DietPlanFullResponse>({
     queryKey: ["diet-current", userId],
     queryFn: async () => {
@@ -23,15 +27,20 @@ export function useCurrentDietPlan(userId = "default_user") {
       return data;
     },
     retry: false,
+    enabled: profile !== undefined,
   });
 }
 
 export function useCreateDietPlan() {
   const queryClient = useQueryClient();
+  const profile = useSelectedProfile();
 
-  return useMutation<DietPlanResponse, Error, DietPlanCreate>({
+  return useMutation<DietPlanResponse, Error, Omit<DietPlanCreate, "user_id">>({
     mutationFn: async (payload) => {
-      const { data } = await api.post("/diet/plans", payload);
+      const { data } = await api.post("/diet/plans", {
+        ...payload,
+        user_id: profile?.user_id ?? "default_user",
+      });
       return data;
     },
     onSuccess: () => {
@@ -217,9 +226,11 @@ export function useAddMealToVariation() {
 // ============================================================
 
 export function useExportDietExcel() {
-  return async (userId = "default_user") => {
+  const profile = useSelectedProfile();
+
+  return async () => {
     const response = await api.get("/diet/export/excel", {
-      params: { user_id: userId },
+      params: { user_id: profile?.user_id ?? "default_user" },
       responseType: "blob",
     });
     const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -234,9 +245,11 @@ export function useExportDietExcel() {
 }
 
 export function useExportDietPdf() {
-  return async (userId = "default_user") => {
+  const profile = useSelectedProfile();
+
+  return async () => {
     const response = await api.get("/diet/export/pdf", {
-      params: { user_id: userId },
+      params: { user_id: profile?.user_id ?? "default_user" },
       responseType: "blob",
     });
     const url = window.URL.createObjectURL(new Blob([response.data]));

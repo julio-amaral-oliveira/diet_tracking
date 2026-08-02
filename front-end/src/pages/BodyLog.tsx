@@ -141,7 +141,7 @@ export default function BodyLog() {
   const checkStagnation = useCheckStagnation();
   const applySuggestion = useApplySuggestion();
   const dismissSuggestion = useDismissSuggestion();
-  const { data: logs, isLoading: logsLoading } = useBodyLogs("default_user", undefined, undefined, 0, 100);
+  const { data: logs, isLoading: logsLoading } = useBodyLogs(undefined, undefined, 0, 100);
   const today = new Date().toISOString().split("T")[0];
 
   const [editingLog, setEditingLog] = useState<BodyLogResponse | null>(null);
@@ -206,7 +206,6 @@ export default function BodyLog() {
 
     const payload = {
       date: data.date,
-      user_id: "default_user",
       weight_kg: weightNum,
       skinfold_chest: toNum(data.skinfold_chest),
       skinfold_abdominal: toNum(data.skinfold_abdominal),
@@ -249,7 +248,7 @@ export default function BodyLog() {
 
         // Task 5: Trigger stagnation check after successful log
         checkStagnation.mutate(
-          { user_id: "default_user" },
+          undefined,
           {
             onSuccess: (stagnation) => {
               if (stagnation.is_stagnating) {
@@ -384,7 +383,6 @@ export default function BodyLog() {
     if (!stagnationData) return;
     applySuggestion.mutate(
       {
-        user_id: "default_user",
         calorie_adjustment: stagnationData.suggested_calorie_adjustment ?? 0,
         carb_adjustment_g: stagnationData.suggested_carb_adjustment_g ?? 0,
         w_curr: stagnationData.current_week_avg_weight,
@@ -870,7 +868,6 @@ export default function BodyLog() {
                     }
                     dismissSuggestion.mutate(
                       {
-                        user_id: "default_user",
                         w_curr: stagnationData.current_week_avg_weight,
                         w_prev: stagnationData.previous_week_avg_weight,
                       },

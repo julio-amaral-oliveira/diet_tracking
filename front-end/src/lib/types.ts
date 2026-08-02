@@ -1,3 +1,19 @@
+// ── Profile ──
+export interface ProfileResponse {
+  id: number;
+  user_id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface ProfileCreate {
+  name: string;
+}
+
+export interface ProfileUpdate {
+  name: string;
+}
+
 // ── Food ──
 export interface FoodItemCreate {
   name: string;
@@ -191,10 +207,6 @@ export interface DashboardStats {
 }
 
 // ── Coach ──
-export interface StagnationCheckRequest {
-  user_id: string;
-}
-
 export type AnalysisState = "weight_loss" | "slow_gain" | "optimal" | "high_velocity";
 
 export interface StagnationResult {
@@ -236,20 +248,6 @@ export interface StagnationResult {
   // New targets
   new_target_calories: number | null;
   new_target_carbs: number | null;
-}
-
-export interface ApplySuggestionRequest {
-  user_id: string;
-  calorie_adjustment: number;
-  carb_adjustment_g: number;
-  w_curr: number;
-  w_prev: number;
-}
-
-export interface DismissSuggestionRequest {
-  user_id: string;
-  w_curr: number;
-  w_prev: number;
 }
 
 export interface MessageResponse {

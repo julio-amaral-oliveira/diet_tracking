@@ -6,6 +6,7 @@ import {
   Database,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ProfileSwitcher } from "./ProfileSwitcher";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -25,6 +26,9 @@ export function Navbar() {
           <div className="flex items-center gap-3 px-6 py-5 border-b">
             <Dumbbell className="h-7 w-7 text-primary" />
             <h1 className="text-lg font-bold tracking-tight">Bulking Control</h1>
+          </div>
+          <div className="px-3 pt-3">
+            <ProfileSwitcher />
           </div>
           <nav className="flex-1 px-3 py-4 space-y-1">
             {navItems.map((item) => {

@@ -1,14 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/axios";
+import { useSelectedProfile } from "@/contexts/ProfileContext";
 import type { BodyLogCreate, BodyLogResponse, MessageResponse } from "@/lib/types";
 
 export function useBodyLogs(
-  userId = "default_user",
   startDate?: string,
   endDate?: string,
   skip = 0,
   limit = 50
 ) {
+  const profile = useSelectedProfile();
+  const userId = profile?.user_id ?? "default_user";
+
   return useQuery<BodyLogResponse[]>({
     queryKey: ["body-logs", userId, startDate, endDate, skip, limit],
     queryFn: async () => {
@@ -23,15 +26,20 @@ export function useBodyLogs(
       });
       return data;
     },
+    enabled: profile !== undefined,
   });
 }
 
 export function useCreateBodyLog() {
   const queryClient = useQueryClient();
+  const profile = useSelectedProfile();
 
-  return useMutation<BodyLogResponse, Error, BodyLogCreate>({
+  return useMutation<BodyLogResponse, Error, Omit<BodyLogCreate, "user_id">>({
     mutationFn: async (payload) => {
-      const { data } = await api.post("/body-logs/", payload);
+      const { data } = await api.post("/body-logs/", {
+        ...payload,
+        user_id: profile?.user_id ?? "default_user",
+      });
       return data;
     },
     onSuccess: () => {
@@ -43,10 +51,14 @@ export function useCreateBodyLog() {
 
 export function useUpdateBodyLog() {
   const queryClient = useQueryClient();
+  const profile = useSelectedProfile();
 
-  return useMutation<BodyLogResponse, Error, { id: number; data: Partial<BodyLogCreate> }>({
+  return useMutation<BodyLogResponse, Error, { id: number; data: Omit<BodyLogCreate, "user_id"> }>({
     mutationFn: async ({ id, data: payload }) => {
-      const { data } = await api.put(`/body-logs/${id}`, payload);
+      const { data } = await api.put(`/body-logs/${id}`, {
+        ...payload,
+        user_id: profile?.user_id ?? "default_user",
+      });
       return data;
     },
     onSuccess: () => {

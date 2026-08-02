@@ -32,6 +32,30 @@ from app.core.database import Base
 
 
 # ============================================================
+# PROFILE — A person using the app (multi-profile support)
+# ============================================================
+class Profile(Base):
+    """
+    Represents a person who uses the app (e.g., "João", "Maria").
+
+    Each profile owns its own DietPlans and BodyLogs through the
+    user_id string (e.g., "default_user" for the default profile).
+    FoodItems are shared across all profiles (reference database).
+    """
+    __tablename__ = "profiles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    def __repr__(self) -> str:
+        return f"<Profile(id={self.id}, user_id='{self.user_id}', name='{self.name}')>"
+
+
+# ============================================================
 # FOOD ITEM — Nutritional data stored per 100g (label format)
 # ============================================================
 class FoodItem(Base):

@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useCheckStagnation, useApplySuggestion, useDismissSuggestion } from "@/hooks/use-coach";
 import { toast } from "@/hooks/use-toast";
+import { useSelectedProfile } from "@/contexts/ProfileContext";
 import type { AnalysisState } from "@/lib/types";
 
 /* ── Helpers ────────────────────────────────────────────────── */
@@ -63,20 +64,21 @@ const METER_DISPLAY_MAX = 2.5; // max value shown on the meter
 /* ── Component ──────────────────────────────────────────────── */
 
 export function CoachWidget() {
+  const profile = useSelectedProfile();
   const stagnation = useCheckStagnation();
   const applySuggestion = useApplySuggestion();
   const dismissSuggestion = useDismissSuggestion();
 
   useEffect(() => {
-    stagnation.mutate({ user_id: "default_user" });
+    stagnation.reset();
+    stagnation.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [profile?.user_id]);
 
   const handleApply = () => {
     if (!stagnation.data) return;
     applySuggestion.mutate(
       {
-        user_id: "default_user",
         calorie_adjustment: stagnation.data.suggested_calorie_adjustment ?? 0,
         carb_adjustment_g: stagnation.data.suggested_carb_adjustment_g ?? 0,
         w_curr: stagnation.data.current_week_avg_weight,
@@ -88,7 +90,7 @@ export function CoachWidget() {
             title: "Sugestão aplicada!",
             description: "As metas de carboidrato e calorias foram atualizadas.",
           });
-          stagnation.mutate({ user_id: "default_user" });
+          stagnation.mutate();
         },
         onError: () => {
           toast({
@@ -105,7 +107,6 @@ export function CoachWidget() {
     if (!stagnation.data) return;
     dismissSuggestion.mutate(
       {
-        user_id: "default_user",
         w_curr: stagnation.data.current_week_avg_weight,
         w_prev: stagnation.data.previous_week_avg_weight,
       },
@@ -115,7 +116,7 @@ export function CoachWidget() {
             title: "Sugestão dispensada",
             description: "Não será exibida novamente até novos dados de peso.",
           });
-          stagnation.mutate({ user_id: "default_user" });
+          stagnation.mutate();
         },
         onError: () => {
           toast({

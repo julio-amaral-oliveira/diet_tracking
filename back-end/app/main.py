@@ -25,7 +25,7 @@ from app.core.config import settings
 from app.core.database import Base, async_engine
 
 # Import all routers
-from app.routers import body_logs, coach, dashboard, diet, foods
+from app.routers import body_logs, coach, dashboard, diet, foods, profiles
 
 # Configure logging so we can see what's happening in the console
 logging.basicConfig(
@@ -110,6 +110,18 @@ async def lifespan(app: FastAPI):
 
         logger.info("✅ Schema migrations applied")
 
+        # Seed the default profile so existing data (user_id='default_user')
+        # always belongs to a real profile.
+        exists = await conn.scalar(text(
+            "SELECT 1 FROM profiles WHERE user_id = 'default_user' LIMIT 1"
+        ))
+        if not exists:
+            await conn.execute(text(
+                "INSERT INTO profiles (user_id, name, created_at) "
+                "VALUES ('default_user', 'Meu Perfil', now())"
+            ))
+            logger.info("✅ Default profile 'Meu Perfil' created")
+
     yield  # Application is running — handle requests
 
     # ----- SHUTDOWN -----
@@ -159,6 +171,7 @@ app.include_router(diet.router)         # /diet/*
 app.include_router(body_logs.router)    # /body-logs/*
 app.include_router(dashboard.router)    # /dashboard/*
 app.include_router(coach.router)        # /coach/*
+app.include_router(profiles.router)     # /profiles/*
 
 
 # ============================================================

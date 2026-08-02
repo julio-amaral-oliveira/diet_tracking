@@ -8,7 +8,7 @@ import { CoachWidget } from "@/components/dashboard/CoachWidget";
 
 export default function Dashboard() {
   const { data: stats, isLoading, isError } = useDashboardStats(60);
-  const { data: bodyLogs } = useBodyLogs("default_user", undefined, undefined, 0, 200);
+  const { data: bodyLogs } = useBodyLogs(undefined, undefined, 0, 200);
 
   if (isLoading) {
     return (

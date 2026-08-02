@@ -17,6 +17,33 @@ from pydantic import BaseModel, Field, model_validator
 
 
 # ============================================================
+# PROFILE SCHEMAS
+# ============================================================
+
+class ProfileCreate(BaseModel):
+    """
+    Schema for creating a new profile.
+    The user_id is generated server-side (not provided by the client).
+    """
+    name: str = Field(..., min_length=1, max_length=255, description="Profile name (e.g., 'João', 'Maria')")
+
+
+class ProfileUpdate(BaseModel):
+    """Schema for renaming an existing profile."""
+    name: str = Field(..., min_length=1, max_length=255, description="New profile name")
+
+
+class ProfileResponse(BaseModel):
+    """Schema returned when a profile is fetched from the API."""
+    id: int
+    user_id: str
+    name: str
+    created_at: datetime.datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ============================================================
 # FOOD ITEM SCHEMAS
 # ============================================================
 

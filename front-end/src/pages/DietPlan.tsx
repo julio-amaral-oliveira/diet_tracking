@@ -112,7 +112,7 @@ export default function DietPlan() {
   const deleteVariation = useDeleteVariation();
   const exportExcel = useExportDietExcel();
   const exportPdf = useExportDietPdf();
-  const { data: bodyLogs } = useBodyLogs("default_user", undefined, undefined, 0, 1);
+  const { data: bodyLogs } = useBodyLogs(undefined, undefined, 0, 1);
 
   const latestWeight = bodyLogs?.[0]?.weight_kg ?? null;
 
@@ -344,7 +344,6 @@ export default function DietPlan() {
 
     createPlan.mutate(
       {
-        user_id: "default_user",
         target_calories: cal,
         target_protein: abs.protein,
         target_carbs: abs.carbs,
