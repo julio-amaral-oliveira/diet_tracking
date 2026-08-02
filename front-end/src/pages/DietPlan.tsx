@@ -101,6 +101,234 @@ const validateMacroValues = (values: MacroValues) => {
   };
 };
 
+const MacroFormFields = ({
+  mode,
+  isPerKg,
+  setIsPerKg,
+  absolute,
+  setAbsolute,
+  perKg,
+  setPerKg,
+  computedCal,
+  errors,
+  formError,
+  latestWeight,
+  onClearError,
+}: {
+  mode: string;
+  isPerKg: boolean;
+  setIsPerKg: (v: boolean) => void;
+  absolute: MacroValues;
+  setAbsolute: (v: MacroValues) => void;
+  perKg: MacroValues;
+  setPerKg: (v: MacroValues) => void;
+  computedCal: number;
+  errors: MacroFieldErrors;
+  formError: string;
+  latestWeight: number | null;
+  onClearError: (field: keyof MacroValues) => void;
+}) => (
+  <div className="space-y-4">
+    {/* Toggle g/kg */}
+    <div className="flex items-center gap-3">
+      <button
+        type="button"
+        onClick={() => setIsPerKg(false)}
+        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+          !isPerKg
+            ? "bg-primary text-primary-foreground"
+            : "bg-muted text-muted-foreground hover:bg-accent"
+        }`}
+      >
+        Gramas totais
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          if (!latestWeight) {
+            toast({
+              title: "Peso não registrado",
+              description: "Registre seu peso na seção Body Log antes de usar g/kg.",
+              variant: "destructive",
+            });
+            return;
+          }
+          setIsPerKg(true);
+        }}
+        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+          isPerKg
+            ? "bg-primary text-primary-foreground"
+            : "bg-muted text-muted-foreground hover:bg-accent"
+        }`}
+      >
+        g/kg de peso
+      </button>
+      {isPerKg && latestWeight && (
+        <span className="text-xs text-muted-foreground">
+          ({latestWeight.toFixed(1)} kg)
+        </span>
+      )}
+    </div>
+
+    {!latestWeight && isPerKg && (
+      <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-950/20 p-2.5">
+        <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0" />
+        <p className="text-xs text-yellow-300">
+          Nenhum peso registrado. Por favor, registre seu peso primeiro.
+        </p>
+      </div>
+    )}
+
+    <div className="grid grid-cols-2 gap-4">
+      {!isPerKg ? (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor={`${mode}-protein`}>Proteína total (g)</Label>
+            <Input
+              id={`${mode}-protein`}
+              type="number"
+              min="0"
+              step="1"
+              inputMode="decimal"
+              value={absolute.protein}
+              onChange={(e) => {
+                setAbsolute({ ...absolute, protein: e.target.value });
+                onClearError("protein");
+              }}
+              placeholder="Ex: 180"
+              aria-invalid={Boolean(errors.protein)}
+              aria-describedby={errors.protein ? `${mode}-protein-error` : undefined}
+            />
+            {errors.protein && <p id={`${mode}-protein-error`} className="text-xs text-destructive">{errors.protein}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${mode}-carbs`}>Carboidratos totais (g)</Label>
+            <Input
+              id={`${mode}-carbs`}
+              type="number"
+              min="0"
+              step="1"
+              inputMode="decimal"
+              value={absolute.carbs}
+              onChange={(e) => {
+                setAbsolute({ ...absolute, carbs: e.target.value });
+                onClearError("carbs");
+              }}
+              placeholder="Ex: 300"
+              aria-invalid={Boolean(errors.carbs)}
+              aria-describedby={errors.carbs ? `${mode}-carbs-error` : undefined}
+            />
+            {errors.carbs && <p id={`${mode}-carbs-error`} className="text-xs text-destructive">{errors.carbs}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${mode}-fat`}>Gordura total (g)</Label>
+            <Input
+              id={`${mode}-fat`}
+              type="number"
+              min="0"
+              step="1"
+              inputMode="decimal"
+              value={absolute.fat}
+              onChange={(e) => {
+                setAbsolute({ ...absolute, fat: e.target.value });
+                onClearError("fat");
+              }}
+              placeholder="Ex: 80"
+              aria-invalid={Boolean(errors.fat)}
+              aria-describedby={errors.fat ? `${mode}-fat-error` : undefined}
+            />
+            {errors.fat && <p id={`${mode}-fat-error`} className="text-xs text-destructive">{errors.fat}</p>}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor={`${mode}-protein-per-kg`}>Proteína por kg (g/kg)</Label>
+            <Input
+              id={`${mode}-protein-per-kg`}
+              type="number"
+              min="0"
+              step="0.1"
+              inputMode="decimal"
+              value={perKg.protein}
+              onChange={(e) => {
+                setPerKg({ ...perKg, protein: e.target.value });
+                onClearError("protein");
+              }}
+              placeholder="Ex: 2,0"
+              aria-invalid={Boolean(errors.protein)}
+              aria-describedby={errors.protein ? `${mode}-protein-per-kg-error` : undefined}
+            />
+            {errors.protein && <p id={`${mode}-protein-per-kg-error`} className="text-xs text-destructive">{errors.protein}</p>}
+            {latestWeight && perKg.protein && (
+              <p className="text-xs text-muted-foreground">
+                = {((parseFloat(perKg.protein) || 0) * latestWeight).toFixed(0)}g
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${mode}-carbs-per-kg`}>Carboidratos por kg (g/kg)</Label>
+            <Input
+              id={`${mode}-carbs-per-kg`}
+              type="number"
+              min="0"
+              step="0.1"
+              inputMode="decimal"
+              value={perKg.carbs}
+              onChange={(e) => {
+                setPerKg({ ...perKg, carbs: e.target.value });
+                onClearError("carbs");
+              }}
+              placeholder="Ex: 4,0"
+              aria-invalid={Boolean(errors.carbs)}
+              aria-describedby={errors.carbs ? `${mode}-carbs-per-kg-error` : undefined}
+            />
+            {errors.carbs && <p id={`${mode}-carbs-per-kg-error`} className="text-xs text-destructive">{errors.carbs}</p>}
+            {latestWeight && perKg.carbs && (
+              <p className="text-xs text-muted-foreground">
+                = {((parseFloat(perKg.carbs) || 0) * latestWeight).toFixed(0)}g
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${mode}-fat-per-kg`}>Gordura por kg (g/kg)</Label>
+            <Input
+              id={`${mode}-fat-per-kg`}
+              type="number"
+              min="0"
+              step="0.1"
+              inputMode="decimal"
+              value={perKg.fat}
+              onChange={(e) => {
+                setPerKg({ ...perKg, fat: e.target.value });
+                onClearError("fat");
+              }}
+              placeholder="Ex: 1,0"
+              aria-invalid={Boolean(errors.fat)}
+              aria-describedby={errors.fat ? `${mode}-fat-per-kg-error` : undefined}
+            />
+            {errors.fat && <p id={`${mode}-fat-per-kg-error`} className="text-xs text-destructive">{errors.fat}</p>}
+            {latestWeight && perKg.fat && (
+              <p className="text-xs text-muted-foreground">
+                = {((parseFloat(perKg.fat) || 0) * latestWeight).toFixed(0)}g
+              </p>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Auto-calculated calories */}
+      <div className="space-y-2">
+        <Label className="text-muted-foreground">Calorias (auto)</Label>
+        <div className="flex h-9 w-full items-center rounded-md border bg-muted/50 px-3 text-sm text-muted-foreground">
+          {computedCal > 0 ? `${computedCal} kcal` : "-"}
+        </div>
+      </div>
+    </div>
+    {formError && <p className="text-xs text-destructive">{formError}</p>}
+  </div>
+);
+
 export default function DietPlan() {
   const { data: plan, isLoading, isError } = useCurrentDietPlan();
   const addMealToVariation = useAddMealToVariation();
@@ -537,232 +765,6 @@ export default function DietPlan() {
     }
   };
 
-  // Shared macro form component
-  const MacroFormFields = ({
-    mode,
-    isPerKg,
-    setIsPerKg,
-    absolute,
-    setAbsolute,
-    perKg,
-    setPerKg,
-    computedCal,
-    errors,
-    formError,
-    onClearError,
-  }: {
-    mode: string;
-    isPerKg: boolean;
-    setIsPerKg: (v: boolean) => void;
-    absolute: MacroValues;
-    setAbsolute: (v: MacroValues) => void;
-    perKg: MacroValues;
-    setPerKg: (v: MacroValues) => void;
-    computedCal: number;
-    errors: MacroFieldErrors;
-    formError: string;
-    onClearError: (field: keyof MacroValues) => void;
-  }) => (
-    <div className="space-y-4">
-      {/* Toggle g/kg */}
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setIsPerKg(false)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            !isPerKg
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted text-muted-foreground hover:bg-accent"
-          }`}
-        >
-          Gramas totais
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (!latestWeight) {
-              toast({
-                title: "Peso não registrado",
-                description: "Registre seu peso na seção Body Log antes de usar g/kg.",
-                variant: "destructive",
-              });
-              return;
-            }
-            setIsPerKg(true);
-          }}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            isPerKg
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted text-muted-foreground hover:bg-accent"
-          }`}
-        >
-          g/kg de peso
-        </button>
-        {isPerKg && latestWeight && (
-          <span className="text-xs text-muted-foreground">
-            ({latestWeight.toFixed(1)} kg)
-          </span>
-        )}
-      </div>
-
-      {!latestWeight && isPerKg && (
-        <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-950/20 p-2.5">
-          <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0" />
-          <p className="text-xs text-yellow-300">
-            Nenhum peso registrado. Por favor, registre seu peso primeiro.
-          </p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-4">
-        {!isPerKg ? (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor={`${mode}-protein`}>Proteína total (g)</Label>
-              <Input
-                id={`${mode}-protein`}
-                type="number"
-                min="0"
-                step="1"
-                inputMode="decimal"
-                value={absolute.protein}
-                onChange={(e) => {
-                  setAbsolute({ ...absolute, protein: e.target.value });
-                  onClearError("protein");
-                }}
-                placeholder="Ex: 180"
-                aria-invalid={Boolean(errors.protein)}
-                aria-describedby={errors.protein ? `${mode}-protein-error` : undefined}
-              />
-              {errors.protein && <p id={`${mode}-protein-error`} className="text-xs text-destructive">{errors.protein}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor={`${mode}-carbs`}>Carboidratos totais (g)</Label>
-              <Input
-                id={`${mode}-carbs`}
-                type="number"
-                min="0"
-                step="1"
-                inputMode="decimal"
-                value={absolute.carbs}
-                onChange={(e) => {
-                  setAbsolute({ ...absolute, carbs: e.target.value });
-                  onClearError("carbs");
-                }}
-                placeholder="Ex: 300"
-                aria-invalid={Boolean(errors.carbs)}
-                aria-describedby={errors.carbs ? `${mode}-carbs-error` : undefined}
-              />
-              {errors.carbs && <p id={`${mode}-carbs-error`} className="text-xs text-destructive">{errors.carbs}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor={`${mode}-fat`}>Gordura total (g)</Label>
-              <Input
-                id={`${mode}-fat`}
-                type="number"
-                min="0"
-                step="1"
-                inputMode="decimal"
-                value={absolute.fat}
-                onChange={(e) => {
-                  setAbsolute({ ...absolute, fat: e.target.value });
-                  onClearError("fat");
-                }}
-                placeholder="Ex: 80"
-                aria-invalid={Boolean(errors.fat)}
-                aria-describedby={errors.fat ? `${mode}-fat-error` : undefined}
-              />
-              {errors.fat && <p id={`${mode}-fat-error`} className="text-xs text-destructive">{errors.fat}</p>}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor={`${mode}-protein-per-kg`}>Proteína por kg (g/kg)</Label>
-              <Input
-                id={`${mode}-protein-per-kg`}
-                type="number"
-                min="0"
-                step="0.1"
-                inputMode="decimal"
-                value={perKg.protein}
-                onChange={(e) => {
-                  setPerKg({ ...perKg, protein: e.target.value });
-                  onClearError("protein");
-                }}
-                placeholder="Ex: 2,0"
-                aria-invalid={Boolean(errors.protein)}
-                aria-describedby={errors.protein ? `${mode}-protein-per-kg-error` : undefined}
-              />
-              {errors.protein && <p id={`${mode}-protein-per-kg-error`} className="text-xs text-destructive">{errors.protein}</p>}
-              {latestWeight && perKg.protein && (
-                <p className="text-xs text-muted-foreground">
-                  = {((parseFloat(perKg.protein) || 0) * latestWeight).toFixed(0)}g
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor={`${mode}-carbs-per-kg`}>Carboidratos por kg (g/kg)</Label>
-              <Input
-                id={`${mode}-carbs-per-kg`}
-                type="number"
-                min="0"
-                step="0.1"
-                inputMode="decimal"
-                value={perKg.carbs}
-                onChange={(e) => {
-                  setPerKg({ ...perKg, carbs: e.target.value });
-                  onClearError("carbs");
-                }}
-                placeholder="Ex: 4,0"
-                aria-invalid={Boolean(errors.carbs)}
-                aria-describedby={errors.carbs ? `${mode}-carbs-per-kg-error` : undefined}
-              />
-              {errors.carbs && <p id={`${mode}-carbs-per-kg-error`} className="text-xs text-destructive">{errors.carbs}</p>}
-              {latestWeight && perKg.carbs && (
-                <p className="text-xs text-muted-foreground">
-                  = {((parseFloat(perKg.carbs) || 0) * latestWeight).toFixed(0)}g
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor={`${mode}-fat-per-kg`}>Gordura por kg (g/kg)</Label>
-              <Input
-                id={`${mode}-fat-per-kg`}
-                type="number"
-                min="0"
-                step="0.1"
-                inputMode="decimal"
-                value={perKg.fat}
-                onChange={(e) => {
-                  setPerKg({ ...perKg, fat: e.target.value });
-                  onClearError("fat");
-                }}
-                placeholder="Ex: 1,0"
-                aria-invalid={Boolean(errors.fat)}
-                aria-describedby={errors.fat ? `${mode}-fat-per-kg-error` : undefined}
-              />
-              {errors.fat && <p id={`${mode}-fat-per-kg-error`} className="text-xs text-destructive">{errors.fat}</p>}
-              {latestWeight && perKg.fat && (
-                <p className="text-xs text-muted-foreground">
-                  = {((parseFloat(perKg.fat) || 0) * latestWeight).toFixed(0)}g
-                </p>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* Auto-calculated calories */}
-        <div className="space-y-2">
-          <Label className="text-muted-foreground">Calorias (auto)</Label>
-          <div className="flex h-9 w-full items-center rounded-md border bg-muted/50 px-3 text-sm text-muted-foreground">
-            {computedCal > 0 ? `${computedCal} kcal` : "-"}
-          </div>
-        </div>
-      </div>
-      {formError && <p className="text-xs text-destructive">{formError}</p>}
-    </div>
-  );
 
   if (isLoading) {
     return (
@@ -808,6 +810,7 @@ export default function DietPlan() {
             </DialogHeader>
             <MacroFormFields
               mode="create"
+              latestWeight={latestWeight}
               isPerKg={usePerKg}
               setIsPerKg={setUsePerKg}
               absolute={newPlan}
@@ -1194,6 +1197,7 @@ export default function DietPlan() {
           </DialogHeader>
           <MacroFormFields
             mode="edit"
+            latestWeight={latestWeight}
             isPerKg={editUsePerKg}
             setIsPerKg={setEditUsePerKg}
             absolute={editTargets}
