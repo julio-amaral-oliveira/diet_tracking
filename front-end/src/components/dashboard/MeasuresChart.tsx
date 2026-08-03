@@ -32,7 +32,7 @@ export function MeasuresChart({ bodyLogs }: MeasuresChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Cintura vs Braço (Qualidade do Bulk)</CardTitle>
+        <CardTitle className="text-base">Cintura vs Braço</CardTitle>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (

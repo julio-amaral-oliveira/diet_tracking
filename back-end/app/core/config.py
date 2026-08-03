@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     )
 
     # Application metadata
-    APP_NAME: str = "Bulking Control App"
+    APP_NAME: str = "Controle de Peso"
     APP_VERSION: str = "1.0.0"
 
     model_config = {"env_file": ".env", "extra": "ignore"}

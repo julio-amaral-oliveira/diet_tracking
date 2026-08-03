@@ -1,6 +1,6 @@
-# 🏋️ Bulking Control App — Backend API
+# 🏋️ Controle de Peso — Backend API
 
-Backend API para controle de dieta em fase de bulking (ganho de massa). Gerencia rastreamento nutricional, métricas corporais detalhadas (antropometria), ajustes inteligentes de dieta e importação em massa de dados nutricionais.
+Backend API para controle de peso e composição corporal. Rastreia peso, medidas corporais (antropometria), nutrição e a evolução de cada métrica ao longo do tempo. Suporta múltiplos perfis (uma pessoa por perfil).
 
 ## Tech Stack
 
@@ -31,14 +31,13 @@ docker-compose up --build
 ```bash
 # 1. Crie um ambiente virtual
 python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/Mac
+source venv/bin/activate  # Linux/Mac
 
 # 2. Instale as dependências
 pip install -r requirements.txt
 
 # 3. Configure o banco PostgreSQL e atualize o .env
-# DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/bulking_db
+# DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/weight_db
 
 # 4. Inicie o servidor
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -67,22 +66,30 @@ diet_tracking/
     │   └── database.py         # Engine async e session factory
     ├── routers/
     │   ├── __init__.py
+    │   ├── profiles.py         # Perfis (multi-pessoa)
     │   ├── foods.py            # CRUD de alimentos + importação CSV
     │   ├── diet.py             # Planos de dieta, refeições e itens
     │   ├── body_logs.py        # Registro de medidas corporais
-    │   ├── dashboard.py        # Estatísticas e dados para gráficos
-    │   └── coach.py            # Algoritmo de detecção de estagnação
+    │   └── dashboard.py        # Estatísticas e dados para gráficos
     └── services/
         ├── __init__.py
+        ├── profiles.py         # Lógica de negócio dos perfis
         ├── importer.py         # Parser e limpeza do CSV TACO
         ├── body_fat.py         # Cálculo de gordura corporal (Pollock 7 dobras)
-        ├── diet_calculator.py  # Cálculos de macros da dieta
-        └── coach.py            # Lógica de detecção de estagnação
+        └── diet_calculator.py  # Cálculos de macros da dieta
 ```
 
 ---
 
 ## 🔗 Endpoints da API
+
+### Profiles (Perfis)
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `/profiles/` | Listar perfis |
+| `POST` | `/profiles/` | Criar perfil |
+| `PATCH` | `/profiles/{id}` | Renomear perfil |
+| `DELETE` | `/profiles/{id}` | Excluir perfil e todos os seus dados |
 
 ### Foods (Alimentos)
 | Método | Rota | Descrição |
@@ -113,12 +120,6 @@ diet_tracking/
 |--------|------|-----------|
 | `GET` | `/dashboard/stats` | Dados de séries temporais para gráficos |
 
-### Coach (Treinador)
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| `POST` | `/coach/check-stagnation` | Verificar estagnação de peso |
-| `POST` | `/coach/apply-suggestion` | Aplicar sugestão do coach à dieta |
-
 ---
 
 ## 🧮 Lógica de Negócio
@@ -136,12 +137,6 @@ Densidade = 1.112 - (0.00043499 × S) + (0.00000055 × S²) - (0.00028826 × Ida
 Gordura % = (495 / Densidade) - 450  (Equação de Siri)
 ```
 Onde S = soma das 7 dobras cutâneas em mm.
-
-### Algoritmo do Coach (Detecção de Estagnação)
-1. Busca registros dos últimos **14 dias**
-2. Calcula média de peso: **semana atual** (dias 1-7) vs **semana anterior** (dias 8-14)
-3. Se ganho ≤ **0.1 kg** → estagnação detectada
-4. Sugestão: `Aumento_Carbs = Peso_Atual × 0.5` gramas, `Aumento_Calorias = Carbs × 4`
 
 ---
 
@@ -168,10 +163,12 @@ O endpoint `POST /foods/import-taco` aceita arquivos CSV da tabela TACO com as c
 FoodItem (1) ──── (N) MealItem (N) ──── (1) Meal (N) ──── (1) DietPlan
                                                                
 BodyLog (standalone — um registro por data)
+Profile (1) ──── dono de DietPlans e BodyLogs (via user_id)
 ```
 
-- **FoodItem**: Dados nutricionais por 100g
-- **DietPlan**: Metas diárias de macros (apenas um ativo por vez)
+- **Profile**: Pessoa que usa o app (ex: "João", "Maria"). Cada perfil tem seus próprios planos e registros.
+- **FoodItem**: Dados nutricionais por 100g (compartilhado entre perfis)
+- **DietPlan**: Metas diárias de macros (apenas um ativo por vez por perfil)
 - **Meal**: Refeição dentro do plano (ex: "Café da Manhã", "Pré-Treino")
 - **MealItem**: Liga FoodItem a Meal com quantidade em gramas
 - **BodyLog**: Peso, bioimpedância, dobras cutâneas e circunferências

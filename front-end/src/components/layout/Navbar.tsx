@@ -25,7 +25,7 @@ export function Navbar() {
         <div className="flex flex-col flex-grow bg-card border-r overflow-y-auto">
           <div className="flex items-center gap-3 px-6 py-5 border-b">
             <Dumbbell className="h-7 w-7 text-primary" />
-            <h1 className="text-lg font-bold tracking-tight">Bulking Control</h1>
+            <h1 className="text-lg font-bold tracking-tight">Controle de Peso</h1>
           </div>
           <div className="px-3 pt-3">
             <ProfileSwitcher />
@@ -54,7 +54,7 @@ export function Navbar() {
             })}
           </nav>
           <div className="px-6 py-4 border-t text-xs text-muted-foreground">
-            Bulking Control v1.0
+            Controle de Peso v1.0
           </div>
         </div>
       </aside>

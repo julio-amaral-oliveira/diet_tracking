@@ -1,5 +1,5 @@
 # ============================================================
-# Docker Compose for the Bulking Control App
+# Docker Compose for the Weight Tracker App
 # Spins up two services: the FastAPI app and a PostgreSQL DB.
 # ============================================================
 
