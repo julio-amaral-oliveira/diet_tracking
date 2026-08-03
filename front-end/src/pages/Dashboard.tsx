@@ -4,7 +4,7 @@ import { useBodyLogs } from "@/hooks/use-body-logs";
 import { SummaryCards } from "@/components/dashboard/SummaryCards";
 import { WeightChart } from "@/components/dashboard/WeightChart";
 import { MeasuresChart } from "@/components/dashboard/MeasuresChart";
-import { CoachWidget } from "@/components/dashboard/CoachWidget";
+import { ProgressCard } from "@/components/dashboard/ProgressCard";
 
 export default function Dashboard() {
   const { data: stats, isLoading, isError } = useDashboardStats(60);
@@ -37,7 +37,7 @@ export default function Dashboard() {
 
       <SummaryCards stats={stats} />
 
-      <CoachWidget />
+      <ProgressCard logs={bodyLogs} />
 
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
         <WeightChart data={stats.weight_history} />

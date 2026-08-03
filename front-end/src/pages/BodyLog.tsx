@@ -28,9 +28,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useCreateBodyLog, useBodyLogs, useUpdateBodyLog, useDeleteBodyLog } from "@/hooks/use-body-logs";
-import { useCheckStagnation, useApplySuggestion, useDismissSuggestion } from "@/hooks/use-coach";
 import { toast } from "@/hooks/use-toast";
-import type { BodyLogResponse, StagnationResult } from "@/lib/types";
+import type { BodyLogResponse } from "@/lib/types";
 
 interface BodyLogFormData {
   date: string;
@@ -138,9 +137,6 @@ export default function BodyLog() {
   const createLog = useCreateBodyLog();
   const updateLog = useUpdateBodyLog();
   const deleteLog = useDeleteBodyLog();
-  const checkStagnation = useCheckStagnation();
-  const applySuggestion = useApplySuggestion();
-  const dismissSuggestion = useDismissSuggestion();
   const { data: logs, isLoading: logsLoading } = useBodyLogs(undefined, undefined, 0, 100);
   const today = new Date().toISOString().split("T")[0];
 
@@ -175,10 +171,6 @@ export default function BodyLog() {
   const [editCircCalfLeft, setEditCircCalfLeft] = useState("");
   const [editSaveAttempted, setEditSaveAttempted] = useState(false);
   const [resetMessage, setResetMessage] = useState("");
-
-  // Coach dialog state
-  const [coachDialogOpen, setCoachDialogOpen] = useState(false);
-  const [stagnationData, setStagnationData] = useState<StagnationResult | null>(null);
 
   const {
     register,
@@ -245,21 +237,6 @@ export default function BodyLog() {
         });
         reset(emptyBodyLogFormValues(today));
         setResetMessage("Registro salvo. Campos limpos e data redefinida para hoje.");
-
-        // Task 5: Trigger stagnation check after successful log
-        checkStagnation.mutate(
-          undefined,
-          {
-            onSuccess: (stagnation) => {
-              if (stagnation.is_stagnating) {
-                setStagnationData(stagnation);
-                setCoachDialogOpen(true);
-              }
-              // If not stagnating, the toast above is enough
-            },
-            // If error (not enough data), silently ignore
-          }
-        );
       },
       onError: () => {
         toast({
@@ -377,28 +354,6 @@ export default function BodyLog() {
         toast({ title: "Erro", description: "Não foi possível excluir.", variant: "destructive" });
       },
     });
-  };
-
-  const handleApplyCoachSuggestion = () => {
-    if (!stagnationData) return;
-    applySuggestion.mutate(
-      {
-        calorie_adjustment: stagnationData.suggested_calorie_adjustment ?? 0,
-        carb_adjustment_g: stagnationData.suggested_carb_adjustment_g ?? 0,
-        w_curr: stagnationData.current_week_avg_weight,
-        w_prev: stagnationData.previous_week_avg_weight,
-      },
-      {
-        onSuccess: () => {
-          toast({ title: "Sugestão aplicada!", description: "As metas foram atualizadas." });
-          setCoachDialogOpen(false);
-          setStagnationData(null);
-        },
-        onError: () => {
-          toast({ title: "Erro", description: "Não foi possível aplicar a sugestão.", variant: "destructive" });
-        },
-      }
-    );
   };
 
   return (
@@ -805,93 +760,6 @@ export default function BodyLog() {
         </DialogContent>
       </Dialog>
 
-      {/* Coach Stagnation Dialog (Task 5) */}
-      <Dialog open={coachDialogOpen} onOpenChange={setCoachDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className={stagnationData?.analysis_state === "high_velocity" ? "text-orange-400" : "text-yellow-500"}>
-              {stagnationData?.analysis_state === "high_velocity"
-                ? "Ganho Acelerado Detectado!"
-                : stagnationData?.analysis_state === "weight_loss"
-                  ? "Perda de Peso Detectada!"
-                  : "Ajuste Sugerido!"}
-            </DialogTitle>
-            <DialogDescription>
-              {stagnationData?.analysis_state === "high_velocity"
-                ? "Você está ganhando peso rápido demais. O Coach sugere reduzir sua ingestão."
-                : stagnationData?.analysis_state === "weight_loss"
-                  ? "Você está perdendo peso. O Coach sugere aumentar sua ingestão."
-                  : "Seu ganho de peso está abaixo da meta. O Coach sugere aumentar sua ingestão."}
-            </DialogDescription>
-          </DialogHeader>
-          {stagnationData && (
-            <div className="space-y-4">
-              <div className="rounded-md border p-3 bg-accent/30 space-y-2 text-sm">
-                <p>{stagnationData.message}</p>
-                <div className="grid grid-cols-2 gap-2 mt-3">
-                  <div className="rounded-md border p-2 text-center">
-                    <p className="text-xs text-muted-foreground">Meta Atual</p>
-                    <p className="font-bold">{stagnationData.current_calories != null ? Math.round(stagnationData.current_calories) : "—"} kcal</p>
-                    <p className="text-xs">{stagnationData.current_carbs_g != null ? Math.round(stagnationData.current_carbs_g) : "—"}g carbs</p>
-                  </div>
-                  <div className="rounded-md border p-2 text-center border-yellow-500/50 bg-yellow-950/20">
-                    <p className="text-xs text-yellow-400">Nova Meta Sugerida</p>
-                    <p className="font-bold text-yellow-300">{stagnationData.suggested_calories != null ? Math.round(stagnationData.suggested_calories) : "—"} kcal</p>
-                    <p className="text-xs text-yellow-400">
-                      {stagnationData.suggested_carbs_g != null ? Math.round(stagnationData.suggested_carbs_g) : "—"}g carbs
-                      {stagnationData.suggested_carb_adjustment_g != null && (
-                        <span className="ml-1">
-                          ({stagnationData.suggested_carb_adjustment_g >= 0 ? "+" : ""}
-                          {stagnationData.suggested_carb_adjustment_g.toFixed(0)}g)
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white"
-                  onClick={handleApplyCoachSuggestion}
-                  disabled={applySuggestion.isPending}
-                >
-                  {applySuggestion.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  Aceitar Ajuste
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={dismissSuggestion.isPending}
-                  onClick={() => {
-                    if (!stagnationData) {
-                      setCoachDialogOpen(false);
-                      return;
-                    }
-                    dismissSuggestion.mutate(
-                      {
-                        w_curr: stagnationData.current_week_avg_weight,
-                        w_prev: stagnationData.previous_week_avg_weight,
-                      },
-                      {
-                        onSuccess: () => {
-                          setCoachDialogOpen(false);
-                          setStagnationData(null);
-                        },
-                        onError: () => {
-                          setCoachDialogOpen(false);
-                          setStagnationData(null);
-                        },
-                      }
-                    );
-                  }}
-                >
-                  {dismissSuggestion.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  Dispensar
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
