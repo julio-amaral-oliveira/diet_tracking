@@ -1,5 +1,5 @@
 """
-Bulking Control App — Main Application Entry Point
+Weight Tracker — Main Application Entry Point
 =====================================================
 This is the FastAPI application factory. It:
   1. Creates the FastAPI app instance with metadata
@@ -25,7 +25,7 @@ from app.core.config import settings
 from app.core.database import Base, async_engine
 
 # Import all routers
-from app.routers import body_logs, coach, dashboard, diet, foods, profiles
+from app.routers import body_logs, dashboard, diet, foods, profiles
 
 # Configure logging so we can see what's happening in the console
 logging.basicConfig(
@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI):
       - Disposes the database engine (closes all connections).
     """
     # ----- STARTUP -----
-    logger.info("🚀 Starting Bulking Control App...")
+    logger.info("🚀 Starting Weight Tracker...")
     logger.info(f"📦 Database URL: {settings.DATABASE_URL[:50]}...")
 
     # Create all tables defined in our models
@@ -64,24 +64,17 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
         logger.info("✅ Database tables created/verified successfully")
 
-        # Migrations: add columns that create_all won't add to existing tables
+        # Migrations: drop columns that create_all won't remove from existing tables
         from sqlalchemy import text
-        await conn.execute(text(
-            "ALTER TABLE diet_plans "
-            "ADD COLUMN IF NOT EXISTS last_coach_adjustment_at TIMESTAMPTZ DEFAULT NULL"
-        ))
-        await conn.execute(text(
-            "ALTER TABLE diet_plans "
-            "ADD COLUMN IF NOT EXISTS last_coach_anchor_date DATE DEFAULT NULL"
-        ))
-        await conn.execute(text(
-            "ALTER TABLE diet_plans "
-            "ADD COLUMN IF NOT EXISTS last_coach_w_curr FLOAT DEFAULT NULL"
-        ))
-        await conn.execute(text(
-            "ALTER TABLE diet_plans "
-            "ADD COLUMN IF NOT EXISTS last_coach_w_prev FLOAT DEFAULT NULL"
-        ))
+        for column in (
+            "last_coach_adjustment_at",
+            "last_coach_anchor_date",
+            "last_coach_w_curr",
+            "last_coach_w_prev",
+        ):
+            await conn.execute(text(
+                f"ALTER TABLE diet_plans DROP COLUMN IF EXISTS {column}"
+            ))
 
         # Migration: add variation_id column to meals table
         await conn.execute(text(
@@ -125,7 +118,7 @@ async def lifespan(app: FastAPI):
     yield  # Application is running — handle requests
 
     # ----- SHUTDOWN -----
-    logger.info("🛑 Shutting down Bulking Control App...")
+    logger.info("🛑 Shutting down Weight Tracker...")
     await async_engine.dispose()
     logger.info("✅ Database connections closed")
 
@@ -137,9 +130,9 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description=(
-        "Backend API for the Bulking Control App. "
-        "Tracks nutrition, body metrics, and provides intelligent diet adjustments "
-        "for optimal weight gain during a bulking phase."
+        "Backend API for the Weight Tracker. "
+        "Tracks weight, body composition (body fat, muscle mass) and nutrition, "
+        "showing progress over time for each profile."
     ),
     lifespan=lifespan,
     # OpenAPI docs configuration
@@ -170,7 +163,6 @@ app.include_router(foods.router)        # /foods/*
 app.include_router(diet.router)         # /diet/*
 app.include_router(body_logs.router)    # /body-logs/*
 app.include_router(dashboard.router)    # /dashboard/*
-app.include_router(coach.router)        # /coach/*
 app.include_router(profiles.router)     # /profiles/*
 
 
